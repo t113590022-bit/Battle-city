@@ -1,233 +1,245 @@
 #include "App.hpp"
+#include "TitleMenu.hpp"
+#include "Map.hpp"
+#include "Player.hpp"
+#include "Explosion.hpp"
 
-// #include "external/freetype/include/freetype/internal/ftobjs.h"
 #include "Util/Image.hpp"
 #include "Util/Input.hpp"
 #include "Util/Keycode.hpp"
 #include "Util/Logger.hpp"
 
-std::string App::GetTitleImagePath() const {
-    return std::string(RESOURCE_DIR) + "/image/title/title.png";
+struct Rect {
+    float left;
+    float right;
+    float top;
+    float bottom;
+};
+
+Rect MakeRect(float x, float y, float halfW, float halfH) {
+    return {
+        x - halfW,
+        x + halfW,
+        y + halfH,
+        y - halfH
+    };
 }
 
-std::string App::GetMenuCursorImagePath(int frame) const {
-    if (frame == 0) {
-        return std::string(RESOURCE_DIR) + "/image/title/menu_tank_1.png";
-    }
-    return std::string(RESOURCE_DIR) + "/image/title/menu_tank_2.png";
+bool IsColliding(const Rect& a, const Rect& b) {
+    return !(a.right < b.left ||
+             a.left > b.right ||
+             a.top < b.bottom ||
+             a.bottom > b.top);
 }
-
-void App::DrawTitle() {
-    m_TitleImage = std::make_shared<Character>(GetTitleImagePath());
-    m_TitleImage->m_Transform.scale = {0.7f, 0.7f};
-    m_TitleImage->SetPosition({0.0f, 10.0f});
-    m_Root.AddChild(m_TitleImage);
-}
-
-void App::ClearTitle() {
-    if (m_TitleImage) {
-        m_Root.RemoveChild(m_TitleImage);
-        m_TitleImage.reset();
-    }
-    if (m_MenuCursor) {
-        m_Root.RemoveChild(m_MenuCursor);
-        m_MenuCursor.reset();
-    }
-}
-
-void App::CreateTitleMenuCursor() {
-    m_MenuCursor = std::make_shared<Character>(GetMenuCursorImagePath(m_MenuAnimFrame));
-    m_MenuCursor->SetPosition(m_MenuPositions[m_MenuIndex]);
-    m_MenuCursor->SetVisible(false);
-    m_Root.AddChild(m_MenuCursor);
-}
-
-void App::UpdateTitle() {
-    //判斷封面是否移動到位
-    if (!m_TitleArrived) {
-        if (m_TitleY < m_TitleTargetY) {
-            m_TitleY += m_TitleSlideSpeed;
-
-            if (m_TitleY >= m_TitleTargetY) {
-                m_TitleY = m_TitleTargetY;
-                m_TitleArrived = true;
-
-                if (m_MenuCursor) {
-                    m_MenuCursor->SetVisible(true);
-                }
-            }
-
-            m_TitleImage->SetPosition({m_TitleX, m_TitleY});
-        }
-    } else {
-        if (Util::Input::IsKeyDown(Util::Keycode::W)) {
-            if (m_MenuIndex > 0) {
-                m_MenuIndex--;
-                m_MenuCursor->SetPosition(m_MenuPositions[m_MenuIndex]);
-            }
-        }
-        else if (Util::Input::IsKeyDown(Util::Keycode::S)) {
-            if (m_MenuIndex < 2) {
-                m_MenuIndex++;
-                m_MenuCursor->SetPosition(m_MenuPositions[m_MenuIndex]);
-            }
-        }
-
-        // 游標動畫
-        m_MenuAnimCounter++;
-        if (m_MenuAnimCounter >= m_MenuAnimInterval) {
-            m_MenuAnimCounter = 0;
-            m_MenuAnimFrame = (m_MenuAnimFrame + 1) % 2;
-            m_MenuCursor->SetImage(GetMenuCursorImagePath(m_MenuAnimFrame));
-        }
-
-        if (Util::Input::IsKeyPressed(Util::Keycode::RETURN)) {
-            if (m_MenuIndex == 0) {
-                ClearTitle();
-
-                if (m_MenuCursor) {
-                    m_Root.RemoveChild(m_MenuCursor);
-                    m_MenuCursor.reset();
-                }
-
-                m_PlayerX = 0;
-                m_PlayerY = -300;
-
-                m_Player = std::make_shared<Character>(GetTankImagePath(m_Direction, m_AnimFrame));
-                m_Player->SetPosition({(float)m_PlayerX, (float)m_PlayerY});
-                m_Root.AddChild(m_Player);
-
-                m_Phase = Phase::PLAYING;
-            }
-            else if (m_MenuIndex == 1) {
-                // 先不做任何事
-            }
-            else if (m_MenuIndex == 2) {
-                // 先不做任何事
-            }
-        }
-    }
-}
-
-
-std::string App::GetTankImagePath(Direction dir, int frame) const {
-    switch (dir) {
-        case Direction::UP:
-            return frame == 0
-                ?std::string(RESOURCE_DIR) + "/image/player/1p-front_lv1.png"
-                :std::string(RESOURCE_DIR) + "/image/player/1p-front2_lv1.png";
-        case Direction::DOWN:
-            return frame == 0
-                ?std::string(RESOURCE_DIR) + "/image/player/1p-back_lv1.png"
-                :std::string(RESOURCE_DIR) + "/image/player/1p-back2_lv1.png";
-        case Direction::LEFT:
-            return frame == 0
-                ?std::string(RESOURCE_DIR) + "/image/player/1p-left_lv1.png"
-                :std::string(RESOURCE_DIR) + "/image/player/1p-left2_lv1.png";
-        case Direction::RIGHT:
-            return frame == 0
-                ?std::string(RESOURCE_DIR) + "/image/player/1p-right_lv1.png"
-                :std::string(RESOURCE_DIR) + "/image/player/1p-right2_lv1.png";
-    }
-
-    return "";
-}
-
-
-void App::UpdatePlaying() {
-    bool isMoving = false;
-
-    if (Util::Input::IsKeyPressed(Util::Keycode::W)) {
-        m_PlayerY += m_MoveSpeed;
-        m_Direction = Direction::UP;
-        isMoving = true;
-    } else if (Util::Input::IsKeyPressed(Util::Keycode::S)) {
-        m_PlayerY -= m_MoveSpeed;
-        m_Direction = Direction::DOWN;
-        isMoving = true;
-    } else if (Util::Input::IsKeyPressed(Util::Keycode::A)) {
-        m_PlayerX -= m_MoveSpeed;
-        m_Direction = Direction::LEFT;
-        isMoving = true;
-    } else if (Util::Input::IsKeyPressed(Util::Keycode::D)) {
-        m_PlayerX += m_MoveSpeed;
-        m_Direction = Direction::RIGHT;
-        isMoving = true;
-    }
-
-    if (isMoving) {
-        m_AnimCounter++;
-        if (m_AnimCounter >= m_AnimInterval) {
-            m_AnimCounter = 0;
-            m_AnimFrame = (m_AnimFrame + 1) % 2;
-
-            m_Player -> SetImage(
-                GetTankImagePath(m_Direction, m_AnimFrame)
-            );
-        }
-    } else {
-        m_AnimFrame = 0;
-        m_AnimCounter = 0;
-        m_Player->SetImage(GetTankImagePath(m_Direction, m_AnimFrame));
-    }
-
-    m_Player->SetPosition({(float)m_PlayerX, (float)m_PlayerY});
-}
-
 
 void App::Start() {
     LOG_TRACE("Start");
 
     m_Phase = Phase::TITLE;
 
-    m_TitleX = 0.0f;
-    m_TitleY = -600.0f;   // 從下方出現
-    m_TitleTargetX = 0.0f;
-    m_TitleTargetY = 10.0f;
-    m_TitleSlideSpeed = 6.0f;
-    m_TitleArrived = false;
-
-    DrawTitle();
-    CreateTitleMenuCursor();
+    m_TitleMenu = std::make_unique<TitleMenu>(m_Root);
+    m_TitleMenu->Init();
 
     m_CurrentState = State::UPDATE;
 }
 
+Bullet::Direction App::ConvertDirection(Player::Direction dir) const {
+    switch (dir) {
+        case Player::Direction::UP:
+            return Bullet::Direction::UP;
+        case Player::Direction::DOWN:
+            return Bullet::Direction::DOWN;
+        case Player::Direction::LEFT:
+            return Bullet::Direction::LEFT;
+        case Player::Direction::RIGHT:
+            return Bullet::Direction::RIGHT;
+    }
+
+    return Bullet::Direction::UP;
+}
+
+glm::vec2 App::GetBulletSpawnPosition(glm::vec2 playerPos, Player::Direction dir) const {
+    float bulletX = playerPos.x;
+    float bulletY = playerPos.y;
+
+    const float muzzleOffset = 20.0f;
+
+    switch (dir) {
+        case Player::Direction::UP:
+            bulletY += muzzleOffset;
+            break;
+        case Player::Direction::DOWN:
+            bulletY -= muzzleOffset;
+            break;
+        case Player::Direction::LEFT:
+            bulletX -= muzzleOffset;
+            break;
+        case Player::Direction::RIGHT:
+            bulletX += muzzleOffset;
+            break;
+    }
+
+    return {bulletX, bulletY};
+}
+
+void App::SpawnBullet() {
+    if (!m_Player) return;
+
+    glm::vec2 playerPos = m_Player->GetPosition();
+    Player::Direction playerDir = m_Player->GetDirection();
+    glm::vec2 bulletPos = GetBulletSpawnPosition(playerPos, playerDir);
+
+    for (auto& bullet : m_Bullets) {
+        if (!bullet->IsActive()) {
+            bullet->Init(bulletPos.x, bulletPos.y, ConvertDirection(playerDir));
+            return;
+        }
+    }
+}
+
+void App::SpawnExplosion(float x, float y) {
+    auto explosion = std::make_unique<Explosion>(m_Root);
+    explosion->Init(x, y);
+    m_Explosions.push_back(std::move(explosion));
+}
+
+void App::UpdateBullets() {
+    if (!m_Map) return;
+
+    for (auto& bullet : m_Bullets) {
+        if (!bullet->IsActive()) continue;
+
+        bullet->Update();
+
+        Rect bulletRect = MakeRect(bullet->GetX(), bullet->GetY(), 4.0f, 4.0f);
+        Rect brickRect  = MakeRect(0.0f, 0.0f, 16.0f, 16.0f);
+
+        bool hit = false;
+        float hitX = bullet->GetX();
+        float hitY = bullet->GetY();
+
+        if (IsColliding(bulletRect, brickRect)) {
+            hit = true;
+        }
+        else if (bullet->IsOutOfBounds(*m_Map)) {
+            hit = true;
+        }
+
+        if (hit) {
+            bullet->Deactivate();
+            SpawnExplosion(hitX, hitY);
+        }
+    }
+}
+
+void App::UpdateExplosions() {
+    std::vector<size_t> toRemove;
+
+    for (size_t i = 0; i < m_Explosions.size(); ++i) {
+        m_Explosions[i]->Update();
+
+        if (m_Explosions[i]->IsFinished()) {
+            toRemove.push_back(i);
+        }
+    }
+
+    for (int i = static_cast<int>(toRemove.size()) - 1; i >= 0; --i) {
+        size_t idx = toRemove[i];
+        m_Explosions[idx]->Clear();
+        m_Explosions.erase(m_Explosions.begin() + static_cast<long long>(idx));
+    }
+}
+
 void App::Update() {
-    
-    //TODO: do your things here and delete this line <3
     switch (m_Phase) {
         case Phase::TITLE:
-            UpdateTitle();
+            m_TitleMenu->Update();
+
+            if (m_TitleMenu->ShouldStartGame()) {
+                m_TitleMenu->Clear();
+
+                m_Map = std::make_unique<Map>(m_Root);
+                m_Map->Init();
+
+                m_Player = std::make_unique<Player>(m_Root);
+                m_Player->Init(0.0f, -300.0f);
+
+                m_Bullets.clear();
+                for (int i = 0; i < 10000; ++i) {
+                    m_Bullets.push_back(std::make_unique<Bullet>(m_Root));
+                }
+
+                for (auto& explosion : m_Explosions) {
+                    explosion->Clear();
+                }
+                m_Explosions.clear();
+
+                m_Phase = Phase::PLAYING;
+            }
             break;
-        case Phase::STAGE_INTRO:
-            //之後加
-            break;
+
         case Phase::PLAYING:
-            UpdatePlaying();
+            if (m_ShootCooldownFrames > 0) {
+                --m_ShootCooldownFrames;
+            }
+
+            if (m_Player && m_Map) {
+                m_Player->Update(*m_Map);
+
+                if (Util::Input::IsKeyPressed(Util::Keycode::SPACE) &&
+                    m_ShootCooldownFrames == 0) {
+                    SpawnBullet();
+                    m_ShootCooldownFrames = m_ShootIntervalFrames;
+                }
+            }
+
+            UpdateBullets();
+            UpdateExplosions();
+            break;
+
+        case Phase::STAGE_INTRO:
             break;
         case Phase::STAGE_CLEAR:
-            //之後加
             break;
         case Phase::GAME_OVER:
-            //之後加
             break;
         case Phase::WIN:
-            //之後加
             break;
     }
 
     m_Root.Update();
-    /*
-     * Do not touch the code below as they serve the purpose for
-     * closing the window.
-     */
+
     if (Util::Input::IsKeyUp(Util::Keycode::ESCAPE) ||
         Util::Input::IfExit()) {
         m_CurrentState = State::END;
     }
 }
 
-void App::End() { // NOLINT(this method will mutate members in the future)
+void App::End() {
     LOG_TRACE("End");
+
+    for (auto& bullet : m_Bullets) {
+        bullet->Deactivate();
+    }
+    m_Bullets.clear();
+
+    for (auto& explosion : m_Explosions) {
+        explosion->Clear();
+    }
+    m_Explosions.clear();
+
+    if (m_Player) {
+        m_Player->Clear();
+        m_Player.reset();
+    }
+
+    if (m_Map) {
+        m_Map->Clear();
+        m_Map.reset();
+    }
+
+    if (m_TitleMenu) {
+        m_TitleMenu->Clear();
+        m_TitleMenu.reset();
+    }
 }
