@@ -25,6 +25,8 @@ public:
 
     int GetTile(int row, int col) const;
     bool IsBlocked(int row, int col) const;
+    bool HitTile(float x, float y);
+    bool IsBlockedAtWorld(float x, float y) const;
 
     int WorldToCol(float x) const;
     int WorldToRow(float y) const;
@@ -48,17 +50,23 @@ public:
     int GetColCount() const;
 
 private:
+    void BuildTestMapData();
     void DrawMap();
 
     std::string GetPlayingBgPath() const;
     std::string GetBrickWallPath() const;
+    std::string GetSteelWallPath() const;
+
+    bool IsInsideMapData(int row, int col) const;
 
 private:
     Util::Renderer& m_Root;
 
     std::shared_ptr<Character> m_PlayingBg;
-    std::vector<std::shared_ptr<Character>> m_MapTiles;
+    // 跟 m_MapData 對應的 sprite 陣列
+    std::vector<std::vector<std::shared_ptr<Character>>> m_MapTiles;
 
+    // 0 = empty, 1 = brick, 2 = steel
     std::vector<std::vector<int>> m_MapData;
 
     int m_TileSize = 32;

@@ -9,20 +9,20 @@ Bullet::Bullet(Util::Renderer& root)
     std::string(RESOURCE_DIR) + "/image/bullet/bullet_up.png"
     );
     m_Bullet->SetVisible(false);
-    m_Bullet->SetZIndex(100.0f);
+    m_Bullet->SetZIndex(99.0f);
     m_Root.AddChild(m_Bullet);
 }
 
-void Bullet::Init(float x, float y, Direction dir) {
+void Bullet::Init(float x, float y, Direction dir, float speed) {
     m_X = x;
     m_Y = y;
     m_Direction = dir;
+    m_Speed = speed;
+    m_Active = true;
 
     m_Bullet->SetImage(GetBulletImagePath(dir));
     m_Bullet->SetPosition({m_X, m_Y});
     m_Bullet->SetVisible(true);
-
-    m_Active = true;
 }
 
 std::string Bullet::GetBulletImagePath(Direction dir) const {

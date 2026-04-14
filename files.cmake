@@ -6,6 +6,10 @@ set(SRC_FILES
     Bullet.cpp
     Character.cpp
     Explosion.cpp
+    Enemy.cpp
+    RespawnEffect.cpp
+    Base.cpp
+    GameOverBanner.cpp
 )
 
 set(INCLUDE_FILES
@@ -16,6 +20,10 @@ set(INCLUDE_FILES
     Bullet.hpp
     Character.hpp
     Explosion.hpp
+    Enemy.hpp
+    RespawnEffect.hpp
+    Base.hpp
+    GameOverBanner.hpp
 )
 
 set(TEST_FILES

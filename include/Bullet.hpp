@@ -25,7 +25,7 @@ public:
 
     explicit Bullet(Util::Renderer& root);
 
-    void Init(float x, float y, Direction dir);
+    void Init(float x, float y, Direction dir, float speed);
     void Update();
     // void Clear();
     //
@@ -45,7 +45,8 @@ private:
 
     float m_X = 0.0f;
     float m_Y = 0.0f;
-    float m_Speed = 8.0f;
+    float m_Speed = 5.0f;
+
 
     Direction m_Direction = Direction::UP;
 

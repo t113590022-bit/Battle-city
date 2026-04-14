@@ -15,7 +15,7 @@ void Explosion::Init(float x, float y) {
 
     m_Explosion = std::make_shared<Character>(GetExplosionImagePath(0));
     m_Explosion->SetPosition({m_X, m_Y});
-    m_Explosion->SetZIndex(20.0f);
+    m_Explosion->SetZIndex(98.0f);
     m_Root.AddChild(m_Explosion);
 }
 

@@ -8,6 +8,7 @@
 #include <memory>      // shared_ptr
 #include <string>      // std::string
 #include "Map.hpp"
+#include "Explosion.hpp"
 
 #include <glm/glm.hpp> // glm::vec2
 
@@ -29,6 +30,10 @@ public:
     void Update(const Map& map);
     void Clear();
 
+    bool IsAlive() const;
+    bool IsExplosionFinished() const;
+    void Kill();
+
     glm::vec2 GetPosition() const;
     Direction GetDirection() const;
 
@@ -36,6 +41,8 @@ private:
     std::string GetTankImagePath(Direction dir, int frame) const;
     void UpdateAnimation(bool isMoving);
     void ClampToMap(const Map& map);
+    bool CanMoveTo(float newX, float newY, const Map& map) const;
+
 
 private:
     Util::Renderer& m_Root;
@@ -50,5 +57,8 @@ private:
     int m_AnimFrame = 0;
     int m_AnimCounter = 0;
     int m_AnimInterval = 8;
+
+    bool m_IsAlive = true;
+    std::unique_ptr<Explosion> m_Explosion;
 };
 #endif //PLAYER_HPP
