@@ -14,6 +14,7 @@ void RespawnEffect::Init(float x, float y) {
     m_Y = y;
     m_Frame = 0;
     m_FrameCounter = 0;
+    m_CurrentLoop = 0;
     m_Finished = false;
 
     m_Effect = std::make_shared<Character>(GetImagePath(0));
@@ -42,8 +43,14 @@ void RespawnEffect::Update() {
         m_Frame++;
 
         if (m_Frame >= m_TotalFrames) {
-            m_Finished = true;
-            return;
+            m_CurrentLoop++;
+
+            if (m_CurrentLoop >= m_TotalLoops) {
+                m_Finished = true;
+                return;
+            }
+
+            m_Frame = 0;
         }
 
         m_Effect->SetImage(GetImagePath(m_Frame));

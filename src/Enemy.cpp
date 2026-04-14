@@ -232,6 +232,11 @@ void Enemy::UpdateBullet(Map& map) {
         if (map.HitTile(x, y) || m_Bullet->IsOutOfBounds(map)) {
             m_Bullet->Deactivate();
 
+            if (m_Explosion) {
+                m_Explosion->Clear();
+                m_Explosion.reset();
+            }
+
             m_Explosion = std::make_unique<Explosion>(m_Root);
             m_Explosion->Init(x, y);
         }
@@ -355,6 +360,11 @@ void Enemy::Destroy() {
         m_Enemy->SetVisible(false);
     }
 
+    if (m_Explosion) {
+        m_Explosion->Clear();
+        m_Explosion.reset();
+    }
+
     m_Explosion = std::make_unique<Explosion>(m_Root);
     m_Explosion->Init(m_X, m_Y);
 
@@ -367,6 +377,11 @@ void Enemy::Clear() {
     if (m_Bullet) {
         m_Bullet->Deactivate();
         m_Bullet.reset();
+    }
+
+    if (m_Explosion) {
+        m_Explosion->Clear();
+        m_Explosion.reset();
     }
 
     if (m_Enemy) {

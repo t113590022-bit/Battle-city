@@ -99,6 +99,10 @@ private:
     int m_ShootCooldownFrames = 0;
     int m_ShootIntervalFrames = 70;   // 60 FPS 下約 1.17 秒
 
+    int m_NextSpawnPointIndex = 0;
+    int m_EnemySpawnCooldownFrames = 0;
+    int m_EnemySpawnIntervalFrames = 200;
+
 
     std::unique_ptr<TitleMenu> m_TitleMenu;
     std::unique_ptr<Player> m_Player;

@@ -35,6 +35,9 @@ private:
     int m_FrameInterval = 8;   // 每張圖停幾幀
     int m_TotalFrames = 4;
 
+    int m_CurrentLoop = 0;
+    int m_TotalLoops = 2;      // 播兩輪
+
     bool m_Finished = false;
 };
 

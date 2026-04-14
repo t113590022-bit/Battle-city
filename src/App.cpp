@@ -120,6 +120,9 @@ void App::EnterPlaying() {
 
     PrepareStageEnemies();
 
+    m_NextSpawnPointIndex = 0;
+    m_EnemySpawnCooldownFrames = 0;
+
     StartPlayerRespawn(-200.0f, -384.0f);
     // 不要直接固定生一隻，改成交給 TrySpawnNextEnemy()
     TrySpawnNextEnemy();
@@ -127,7 +130,7 @@ void App::EnterPlaying() {
     m_Base = std::make_unique<Base>(m_Root);
 
     // 地圖底部中央
-    m_Base->Init(0.0f, -360.0f);
+    m_Base->Init(0.0f, -368.0f);
 
     m_PlayerLives = 2;
     m_ShootCooldownFrames = 0;
@@ -180,19 +183,26 @@ int App::GetAliveEnemyCount() const {
 
 void App::TrySpawnNextEnemy() {
     if (m_EnemyRespawning) return;
+    if (m_EnemySpawnCooldownFrames > 0) return;
 
     if (GetAliveEnemyCount() >= m_MaxActiveEnemies) return;
 
     if (m_SpawnedEnemies >= static_cast<int>(m_EnemyQueue.size())) return;
 
-    float spawnX = 0.0f;
-    float spawnY = 392.0f;
+    const float spawnXs[3] = {0.0f, 320.0f, -320.0f};
+    const float spawnY = 392.0f;
+
+    float spawnX = spawnXs[m_NextSpawnPointIndex];
+    m_NextSpawnPointIndex = (m_NextSpawnPointIndex + 1) % 3;
 
     StartEnemySpawn(spawnX, spawnY, m_EnemyQueue[m_SpawnedEnemies]);
     ++m_SpawnedEnemies;
 }
 
 void App::UpdatePlaying() {
+    if (m_EnemySpawnCooldownFrames > 0) {
+        --m_EnemySpawnCooldownFrames;
+    }
     UpdateShootCooldown();
     UpdatePlayer();
     HandleShootInput();
@@ -385,6 +395,7 @@ void App::UpdateBullets() {
             if (IsColliding(bulletRect, enemyRect)) {
                 hit = true;
                 enemy->TakeDamage();
+                bullet->Deactivate();
                 break;
             }
         }
@@ -420,7 +431,7 @@ void App::UpdateBullets() {
                 SpawnExplosion(baseX, baseY);
 
                 EnterGameOver(); // ← 直接結束
-                }
+            }
         }
     }
 }
@@ -579,6 +590,7 @@ void App::UpdateEnemyRespawn() {
         m_Enemies.push_back(std::move(enemy));
 
         m_EnemyRespawning = false;
+        m_EnemySpawnCooldownFrames = m_EnemySpawnIntervalFrames;
     }
 }
 
