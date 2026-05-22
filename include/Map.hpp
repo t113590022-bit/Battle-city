@@ -9,24 +9,32 @@
 #include <string>      // std::string
 #include <vector>      // std::vector
 
-
 #include "Util/Renderer.hpp"
 #include "Character.hpp"
-
+#include "TileObject.hpp"
+#include "Brick.hpp"
+#include "Steel.hpp"
+#include "Grass.hpp"
+#include "Water.hpp"
 
 class Map {
 public:
     explicit Map(Util::Renderer& root);
 
-    void Init();
-    // void DrawFill();
-    // void DrawBorderTest();
+    void Init(const std::vector<std::string>& stageData);
     void Clear();
+    void Update();
 
     int GetTile(int row, int col) const;
+    // bool HitTile(float x, float y);
+
     bool IsBlocked(int row, int col) const;
-    bool HitTile(float x, float y);
     bool IsBlockedAtWorld(float x, float y) const;
+
+    TileObject* GetTileObject(int row, int col) const;
+    TileObject* GetTileObjectAtWorld(float x, float y) const;
+
+    void RemoveTileAtWorld(float x, float y);
 
     int WorldToCol(float x) const;
     int WorldToRow(float y) const;
@@ -50,12 +58,10 @@ public:
     int GetColCount() const;
 
 private:
-    void BuildTestMapData();
+    // void BuildTestMapData();
     void DrawMap();
 
     std::string GetPlayingBgPath() const;
-    std::string GetBrickWallPath() const;
-    std::string GetSteelWallPath() const;
 
     bool IsInsideMapData(int row, int col) const;
 
@@ -63,23 +69,26 @@ private:
     Util::Renderer& m_Root;
 
     std::shared_ptr<Character> m_PlayingBg;
-    // 跟 m_MapData 對應的 sprite 陣列
-    std::vector<std::vector<std::shared_ptr<Character>>> m_MapTiles;
 
-    // 0 = empty, 1 = brick, 2 = steel
-    std::vector<std::vector<int>> m_MapData;
+    // 15 關可換這個資料
+    std::vector<std::string> m_StageData;
+
+    // 每一格真正的地圖物件
+    std::vector<std::vector<std::shared_ptr<TileObject>>> m_Tiles;
+
+    std::vector<std::shared_ptr<Water>> m_WaterTiles;
 
     int m_TileSize = 32;
 
-    float m_MapLeft = -416.0f;
-    float m_MapRight = 416.0f;
-    float m_MapTop = 416.0f;
-    float m_MapBottom = -416.0f;
+    float m_MapLeft = -208.0f;
+    float m_MapRight = 208.0f;
+    float m_MapTop = 208.0f;
+    float m_MapBottom = -208.0f;
 
     // 黑色可活動範圍（給玩家/子彈用）
-    float m_PlayAreaLeft = -412.0f;
-    float m_PlayAreaRight = 412.0f;
-    float m_PlayAreaTop = 412.0f;
-    float m_PlayAreaBottom = -412.0f;
+    float m_PlayAreaLeft = -206.0f;
+    float m_PlayAreaRight = 206.0f;
+    float m_PlayAreaTop = 206.0f;
+    float m_PlayAreaBottom = -206.0f;
 };
 #endif //MAP_HPP

@@ -5,14 +5,20 @@
 #include "cstddef"
 
 #include "TitleMenu.hpp"
+#include "Collision.hpp"
+#include "StageIntroScreen.hpp"
 #include "Player.hpp"
+#include "TileHitInfo.hpp"
+#include "StageData.hpp"
+#include "StageHud.hpp"
 #include "Map.hpp"
 #include "Bullet.hpp"
-#include  "Explosion.hpp"
+#include "Explosion.hpp"
 #include "Enemy.hpp"
 #include "RespawnEffect.hpp"
 #include "Base.hpp"
 #include "GameOverBanner.hpp"
+#include "StageClearScreen.hpp"
 
 #include "pch.hpp" // IWYU pragma: export
 #include "Util/Image.hpp"
@@ -48,11 +54,20 @@ public:
 
 private:
     void UpdateTitle();
+
+    void EnterStageIntro(bool allowSelect);
+    void UpdateStageIntro();
+    void ClearStageIntroUi();
+
     void EnterPlaying();
     void UpdatePlaying();
     void HandleSystemInput();
 
-    void InitMap();
+    void InitStageHud();
+    void UpdateStageHud();
+    void ClearStageHud();
+
+    void InitMap(const std::vector<std::string>& mapData);
     void InitPlayer();
     void InitBullets(int poolSize);
 
@@ -65,6 +80,7 @@ private:
     void HandleShootInput();
 
     Bullet::Direction ConvertDirection(Player::Direction dir) const;
+    HitDirection ConvertBulletDirection(Bullet::Direction dir) const;
     glm::vec2 GetBulletSpawnPosition(glm::vec2 playerPos, Player::Direction dir) const;
 
     void SpawnBullet();
@@ -74,7 +90,7 @@ private:
 
     void InitEnemies();
     void UpdateEnemies();
-    void PrepareStageEnemies();
+    void PrepareStageEnemies(const std::vector<Enemy::EnemyType>& enemies);
     void TrySpawnNextEnemy();
     int GetAliveEnemyCount() const;
     void RemoveDeadEnemies();
@@ -89,6 +105,14 @@ private:
     void EnterGameOver();
     void UpdateGameOver();
     void ClearGameOverUi();
+
+    void EnterStageClear();
+    void UpdateStageClear();
+    void ClearStageClearUi();
+
+    void OnEnemyDestroyed(Enemy::EnemyType type);
+
+    void ClearPlayingObjects();
 
 private:
     State m_CurrentState = State::START;
@@ -105,6 +129,8 @@ private:
 
 
     std::unique_ptr<TitleMenu> m_TitleMenu;
+    std::unique_ptr<StageIntroScreen> m_StageIntroScreen;
+    std::unique_ptr<StageHud> m_StageHud;
     std::unique_ptr<Player> m_Player;
     std::unique_ptr<Map> m_Map;
 
@@ -142,6 +168,15 @@ private:
     // Game Over
     std::shared_ptr<Character> m_GameOverBg;
     std::unique_ptr<GameOverBanner> m_GameOverBanner;
+
+    std::unique_ptr<StageClearScreen> m_StageClearScreen;
+
+    int m_CurrentStage = 1;
+
+    int m_NormalKillCount = 0;
+    int m_FastKillCount = 0;
+    int m_PowerKillCount = 0;
+    int m_HeavyKillCount = 0;
 };
 
 #endif

@@ -25,8 +25,8 @@ private:
     std::shared_ptr<Character> m_Left;
     std::shared_ptr<Character> m_Right;
 
-    float m_LeftX = -40.0f;
-    float m_RightX = 40.0f;
+    float m_LeftX = -18.0f;
+    float m_RightX = 18.0f;
     float m_Y = -500.0f;
 
     float m_TargetY = 0.0f;

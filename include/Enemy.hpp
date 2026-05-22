@@ -6,9 +6,12 @@
 #define ENEMY_HPP
 
 #include <memory>
+#include <vector>
 
 #include "Map.hpp"
+#include "Collision.hpp"
 #include "Bullet.hpp"
+#include "TileHitInfo.hpp"
 #include "Util/Renderer.hpp"
 #include "Character.hpp"
 #include "Explosion.hpp"
@@ -32,7 +35,7 @@ public:
     explicit Enemy(Util::Renderer& root);
 
     void Init(float x, float y, EnemyType type );
-    void Update(Map& map);
+    void Update(Map& map, const std::vector<Rect>& blockingRects, bool hasPlayer, glm::vec2 playerPos);
     void Clear();
 
     float GetX() const { return m_X; }
@@ -40,6 +43,9 @@ public:
 
     bool IsAlive() const { return m_Alive; }
     void Destroy();
+
+    Rect GetCollisionRect() const;
+    Rect GetCollisionRectAt(float x, float y) const;
 
     bool HasActiveBullet() const;
     Bullet* GetBullet() const { return m_Bullet.get(); }
@@ -50,9 +56,23 @@ public:
     int GetHP() const { return m_HP; }
 
 private:
+    // AI想法
+    enum class EnemyIntent {
+        AttackBase,
+        AttackPlayer,
+        Wander
+    };
+
+    HitDirection ConvertBulletDirection(Bullet::Direction dir) const;
     std::string GetTankImagePath(Direction dir) const;
-    bool CanMoveTo(float newX, float newY, const Map& map) const;
-    void ChangeDirectionSmart(const Map& map);
+    bool CanMoveTo(float newX, float newY, const Map& map, const std::vector<Rect>& blockingRects) const;
+    void ChangeDirectionSmart(const Map& map, const std::vector<Rect>& blockingRects, bool hasPlayer, glm::vec2 playerPos);
+
+    EnemyIntent ChooseIntent(bool hasPlayer) const;
+
+    glm::vec2 GetBaseTargetPosition() const;
+
+    float GetDistanceSq(float x, float y, glm::vec2 target) const;
 
     void ClampToMap(const Map& map);
 

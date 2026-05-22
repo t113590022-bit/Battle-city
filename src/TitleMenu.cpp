@@ -3,6 +3,8 @@
 //
 
 #include "TitleMenu.hpp"
+
+#include "Util/Transform.hpp"
 #include "Util/Input.hpp"
 #include "Util/Keycode.hpp"
 
@@ -36,11 +38,18 @@ void TitleMenu::Init() {
 void TitleMenu::DrawTitle() {
     m_TitleImage = std::make_shared<Character>(GetTitleImagePath());
     m_TitleImage->SetPosition({0.0f, m_TitleY});
+    Util::Transform transform;
+
+    m_TitleImage->m_Transform.translation = {0.0f, m_TitleY};
+    m_TitleImage->m_Transform.scale = {0.5f, 0.5f};
+
     m_Root.AddChild(m_TitleImage);
 }
 
 void TitleMenu::CreateMenuCursor() {
     m_MenuCursor = std::make_shared<Character>(GetMenuCursorImagePath(m_MenuAnimFrame));
+
+    m_MenuCursor->m_Transform.scale={0.5f, 0.5f};
     m_MenuCursor->SetPosition(m_MenuPositions[m_MenuIndex]);
     m_MenuCursor->SetVisible(false);
     m_Root.AddChild(m_MenuCursor);
@@ -79,7 +88,9 @@ void TitleMenu::Update() {
     if (m_MenuAnimCounter >= m_MenuAnimInterval) {
         m_MenuAnimCounter = 0;
         m_MenuAnimFrame = (m_MenuAnimFrame + 1) % 2;
+
         m_MenuCursor->SetImage(GetMenuCursorImagePath(m_MenuAnimFrame));
+        m_MenuCursor->m_Transform.scale={0.5f, 0.5f};
     }
 
     // Enter

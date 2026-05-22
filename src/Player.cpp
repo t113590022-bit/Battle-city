@@ -59,6 +59,7 @@ void Player::Init(float x, float y) {
 
     m_Player = std::make_shared<Character>(GetTankImagePath(m_Direction, m_AnimFrame));
     m_Player->SetPosition({m_PlayerX, m_PlayerY});
+    m_Player->SetZIndex(40.0f);
     m_Root.AddChild(m_Player);
 }
 
@@ -91,6 +92,17 @@ glm::vec2 Player::GetPosition() const {
 
 Player::Direction Player::GetDirection() const {
     return m_Direction;
+}
+
+Rect Player::GetCollisionRect() const {
+    return GetCollisionRectAt(m_PlayerX, m_PlayerY);
+}
+
+Rect Player::GetCollisionRectAt(float x, float y) const {
+    const float halfW = 12.0f;
+    const float halfH = 12.0f;
+
+    return MakeRect(x, y, halfW, halfH);
 }
 
 void Player::UpdateAnimation(bool isMoving) {
@@ -130,20 +142,57 @@ void Player::ClampToMap(const Map& map) {
     }
 }
 
-bool Player::CanMoveTo(float newX, float newY, const Map &map) const {
-    const float halfW = 10.0f;
-    const float halfH = 10.0f;
+bool Player::CanMoveTo(float newX, float newY, const Map &map, const std::vector<Rect>& blockingRects) const {
+    const float halfW = 12.0f;
+    const float halfH = 12.0f;
 
-    if (map.IsBlockedAtWorld(newX - halfW, newY + halfH)) return false; // 左上
-    if (map.IsBlockedAtWorld(newX + halfW, newY + halfH)) return false; // 右上
-    if (map.IsBlockedAtWorld(newX - halfW, newY - halfH)) return false; // 左下
-    if (map.IsBlockedAtWorld(newX + halfW, newY - halfH)) return false; // 右下
+    // 檢查碰撞箱邊界上的多個點，避免半磚從邊線中間漏判
+    const glm::vec2 checkPoints[] = {
+        // 四個角
+        {newX - halfW, newY + halfH},
+        {newX + halfW, newY + halfH},
+        {newX - halfW, newY - halfH},
+        {newX + halfW, newY - halfH},
+
+        // 四邊中心
+        {newX,         newY + halfH},
+        {newX,         newY - halfH},
+        {newX - halfW, newY},
+        {newX + halfW, newY},
+
+        // 上下邊 1/4、3/4
+        {newX - halfW * 0.5f, newY + halfH},
+        {newX + halfW * 0.5f, newY + halfH},
+        {newX - halfW * 0.5f, newY - halfH},
+        {newX + halfW * 0.5f, newY - halfH},
+
+        // 左右邊 1/4、3/4
+        {newX - halfW, newY + halfH * 0.5f},
+        {newX - halfW, newY - halfH * 0.5f},
+        {newX + halfW, newY + halfH * 0.5f},
+        {newX + halfW, newY - halfH * 0.5f},
+    };
+
+    for (const auto& point : checkPoints) {
+        if (map.IsBlockedAtWorld(point.x, point.y)) {
+            return false;
+        }
+    }
+
+    // 2. 檢查其他坦克
+    Rect nextRect = GetCollisionRectAt(newX, newY);
+
+    for (const Rect& blocker : blockingRects) {
+        if (IsColliding(nextRect, blocker)) {
+            return false;
+        }
+    }
 
     return true;
 }
 
 
-void Player::Update(const Map& map) {
+void Player::Update(const Map& map, const std::vector<Rect>& blockingRects) {
     // ===== 1. 如果死了，只更新爆炸 =====
     if (!m_IsAlive) {
         if (m_Explosion) {
@@ -185,8 +234,8 @@ void Player::Update(const Map& map) {
 
 
     // 先做邊界限制到候選座標
-    const float halfW = 10.0f;
-    const float halfH = 10.0f;
+    const float halfW = 12.0f;
+    const float halfH = 12.0f;
 
     if (nextX < map.GetPlayLeft() + halfW) {
         nextX = map.GetPlayLeft() + halfW;
@@ -202,7 +251,7 @@ void Player::Update(const Map& map) {
     }
 
     // 再檢查 tilemap
-    if (CanMoveTo(nextX, nextY, map)) {
+    if (CanMoveTo(nextX, nextY, map, blockingRects)) {
         m_PlayerX = nextX;
         m_PlayerY = nextY;
     }

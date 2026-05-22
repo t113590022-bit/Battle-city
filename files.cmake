@@ -1,7 +1,14 @@
 set(SRC_FILES
     App.cpp
     TitleMenu.cpp
+    StageIntroScreen.cpp
+    StageData.cpp
+    StageHud.cpp
     Map.cpp
+    Brick.cpp
+    Steel.cpp
+    Grass.cpp
+    Water.cpp
     Player.cpp
     Bullet.cpp
     Character.cpp
@@ -10,13 +17,23 @@ set(SRC_FILES
     RespawnEffect.cpp
     Base.cpp
     GameOverBanner.cpp
+    StageClearScreen.cpp
 )
 
 set(INCLUDE_FILES
     App.hpp
     TitleMenu.hpp
+    StageIntroScreen.hpp
+    StageHud.hpp
     Player.hpp
+    StageData.hpp
     Map.hpp
+    TileHitInfo.hpp
+    TileObject.hpp
+    Brick.hpp
+    Steel.hpp
+    Grass.hpp
+    Water.hpp
     Bullet.hpp
     Character.hpp
     Explosion.hpp
@@ -24,6 +41,8 @@ set(INCLUDE_FILES
     RespawnEffect.hpp
     Base.hpp
     GameOverBanner.hpp
+    StageClearScreen.hpp
+    TextObject.hpp
 )
 
 set(TEST_FILES

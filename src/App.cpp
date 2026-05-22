@@ -1,4 +1,5 @@
 #include "App.hpp"
+#include "iostream"
 #include "TitleMenu.hpp"
 #include "Map.hpp"
 #include "Player.hpp"
@@ -10,31 +11,9 @@
 #include "Util/Keycode.hpp"
 #include "Util/Logger.hpp"
 
-struct Rect {
-    float left;
-    float right;
-    float top;
-    float bottom;
-};
-
-Rect MakeRect(float x, float y, float halfW, float halfH) {
-    return {
-        x - halfW,
-        x + halfW,
-        y + halfH,
-        y - halfH
-    };
-}
-
-bool IsColliding(const Rect& a, const Rect& b) {
-    return !(a.right < b.left ||
-             a.left > b.right ||
-             a.top < b.bottom ||
-             a.bottom > b.top);
-}
-
 void App::Start() {
     LOG_TRACE("Start");
+    SDL_StopTextInput();
 
     m_Phase = Phase::TITLE;
 
@@ -50,14 +29,16 @@ void App::Update() {
             UpdateTitle();
             break;
 
+        case Phase::STAGE_INTRO:
+            UpdateStageIntro();
+            break;
+
         case Phase::PLAYING:
             UpdatePlaying();
             break;
 
-        case Phase::STAGE_INTRO:
-            break;
-
         case Phase::STAGE_CLEAR:
+            UpdateStageClear();
             break;
 
         case Phase::GAME_OVER:
@@ -75,9 +56,12 @@ void App::Update() {
 void App::End() {
     LOG_TRACE("End");
 
+    ClearStageHud();
     ClearBullets();
     ClearExplosions();
     ClearEnemies();
+    ClearStageClearUi();
+    ClearStageIntroUi();
 
     if (m_Player) {
         m_Player->Clear();
@@ -101,68 +85,162 @@ void App::UpdateTitle() {
     m_TitleMenu->Update();
 
     if (m_TitleMenu->ShouldStartGame()) {
-        EnterPlaying();
+        EnterStageIntro(true);
     }
 }
 
-void App::EnterPlaying() {
+void App::EnterStageIntro(bool allowSelect) {
     if (m_TitleMenu) {
         m_TitleMenu->Clear();
         m_TitleMenu.reset();
     }
 
-    InitMap();
-    // InitPlayer();
+    ClearStageIntroUi();
+    ClearStageClearUi();
+    ClearGameOverUi();
+
+    if (!allowSelect) {
+        ClearPlayingObjects();
+    }
+
+    m_StageIntroScreen = std::make_unique<StageIntroScreen>(m_Root);
+    m_StageIntroScreen->Init(
+        m_CurrentStage,
+        allowSelect,
+        StageData::GetStageCount()
+    );
+
+    m_Phase = Phase::STAGE_INTRO;
+}
+
+void App::UpdateStageIntro() {
+    if (!m_StageIntroScreen) return;
+
+    m_StageIntroScreen->Update();
+
+    if (m_StageIntroScreen->IsFinished()) {
+        m_CurrentStage = m_StageIntroScreen->GetSelectedStage();
+
+        ClearStageIntroUi();
+
+        EnterPlaying();
+    }
+}
+
+void App::ClearStageIntroUi() {
+    if (m_StageIntroScreen) {
+        m_StageIntroScreen->Clear();
+        m_StageIntroScreen.reset();
+    }
+}
+
+void App::UpdateStageClear() {
+    if (m_StageClearScreen) {
+        m_StageClearScreen->Update();
+
+        if (m_StageClearScreen->IsFinished()) {
+            std::cout << "StageClear finished. Current stage before ++ = "
+                     << m_CurrentStage << std::endl;
+
+            ClearStageClearUi();
+
+            ++m_CurrentStage;
+
+            std::cout << "Next stage = " << m_CurrentStage << std::endl;
+            std::cout << "Stage count = " << StageData::GetStageCount() << std::endl;
+
+            // if (m_CurrentStage > StageData::GetStageCount()) {
+            //     std::cout << "Go to WIN phase" << std::endl;
+            //     m_Phase = Phase::WIN;
+            //     return;
+            // }
+
+            EnterStageIntro(false);
+        }
+    }
+}
+
+void App::EnterPlaying() {
+    std::cout << "EnterPlaying stage = " << m_CurrentStage << std::endl;
+
+    if (m_TitleMenu) {
+        m_TitleMenu->Clear();
+        m_TitleMenu.reset();
+    }
+
+    ClearPlayingObjects();
+    ClearStageClearUi();
+
+    StageConfig stage = StageData::GetStage(m_CurrentStage);
+
+    InitMap(stage.mapData);
+
     InitBullets(10);   // 先用 10 顆就很夠了
     ClearExplosions();
     InitEnemies();
     ClearGameOverUi();
+    ClearStageClearUi();
 
-    PrepareStageEnemies();
+    PrepareStageEnemies(stage.enemies);
 
     m_NextSpawnPointIndex = 0;
     m_EnemySpawnCooldownFrames = 0;
 
-    StartPlayerRespawn(-200.0f, -384.0f);
-    // 不要直接固定生一隻，改成交給 TrySpawnNextEnemy()
+    m_PlayerLives = 2;
+    m_ShootCooldownFrames = 0;
+
+    StartPlayerRespawn(-64.0f, -192.0f);
     TrySpawnNextEnemy();
 
     m_Base = std::make_unique<Base>(m_Root);
+    m_Base->Init(0.0f, -192.0f);
 
-    // 地圖底部中央
-    m_Base->Init(0.0f, -368.0f);
+    InitStageHud();
 
-    m_PlayerLives = 2;
-    m_ShootCooldownFrames = 0;
     m_Phase = Phase::PLAYING;
 }
 
+void App::InitStageHud() {
+    ClearStageHud();
+
+    m_StageHud = std::make_unique<StageHud>(m_Root);
+
+    m_StageHud->Init(
+        static_cast<int>(m_EnemyQueue.size()),
+        m_SpawnedEnemies,
+        m_PlayerLives,
+        m_CurrentStage
+    );
+}
+
+void App::UpdateStageHud() {
+    if (!m_StageHud) return;
+
+    m_StageHud->Update(
+        static_cast<int>(m_EnemyQueue.size()),
+        m_SpawnedEnemies,
+        m_PlayerLives,
+        m_CurrentStage
+    );
+}
+
+void App::ClearStageHud() {
+    if (m_StageHud) {
+        m_StageHud->Clear();
+        m_StageHud.reset();
+    }
+}
+
 // 預備敵人生成
-void App::PrepareStageEnemies() {
+void App::PrepareStageEnemies(const std::vector<Enemy::EnemyType>& enemies) {
+    m_NormalKillCount = 0;
+    m_FastKillCount = 0;
+    m_PowerKillCount = 0;
+    m_HeavyKillCount = 0;
+
     m_EnemyQueue.clear();
 
-    m_EnemyQueue = {
-        Enemy::EnemyType::NORMAL,
-        Enemy::EnemyType::NORMAL,
-        Enemy::EnemyType::FAST,
-        Enemy::EnemyType::NORMAL,
-        Enemy::EnemyType::NORMAL,
-        Enemy::EnemyType::POWER,
-        Enemy::EnemyType::NORMAL,
-        Enemy::EnemyType::FAST,
-        Enemy::EnemyType::NORMAL,
-        Enemy::EnemyType::HEAVY,
-        Enemy::EnemyType::NORMAL,
-        Enemy::EnemyType::POWER,
-        Enemy::EnemyType::NORMAL,
-        Enemy::EnemyType::FAST,
-        Enemy::EnemyType::NORMAL,
-        Enemy::EnemyType::NORMAL,
-        Enemy::EnemyType::HEAVY,
-        Enemy::EnemyType::POWER,
-        Enemy::EnemyType::FAST,
-        Enemy::EnemyType::HEAVY
-    };
+    m_EnemyQueue = enemies;
 
     m_SpawnedEnemies = 0;
     m_KilledEnemies = 0;
@@ -189,8 +267,8 @@ void App::TrySpawnNextEnemy() {
 
     if (m_SpawnedEnemies >= static_cast<int>(m_EnemyQueue.size())) return;
 
-    const float spawnXs[3] = {0.0f, 320.0f, -320.0f};
-    const float spawnY = 392.0f;
+    const float spawnXs[3] = {0.0f, 160.0f, -160.0f};
+    const float spawnY = 192.0f;
 
     float spawnX = spawnXs[m_NextSpawnPointIndex];
     m_NextSpawnPointIndex = (m_NextSpawnPointIndex + 1) % 3;
@@ -199,7 +277,37 @@ void App::TrySpawnNextEnemy() {
     ++m_SpawnedEnemies;
 }
 
+void App::OnEnemyDestroyed(Enemy::EnemyType type) {
+    switch (type) {
+        case Enemy::EnemyType::NORMAL:
+            ++m_NormalKillCount;
+            break;
+        case Enemy::EnemyType::FAST:
+            ++m_FastKillCount;
+            break;
+        case Enemy::EnemyType::POWER:
+            ++m_PowerKillCount;
+            break;
+        case Enemy::EnemyType::HEAVY:
+            ++m_HeavyKillCount;
+            break;
+    }
+}
+
 void App::UpdatePlaying() {
+    if (Util::Input::IsKeyPressed(Util::Keycode::F1)) {
+        m_NormalKillCount = 5;
+        m_FastKillCount = 4;
+        m_PowerKillCount = 6;
+        m_HeavyKillCount = 5;
+        EnterStageClear();
+        return;
+    }
+
+    if (m_Map) {
+        m_Map->Update();
+    }
+    
     if (m_EnemySpawnCooldownFrames > 0) {
         --m_EnemySpawnCooldownFrames;
     }
@@ -213,10 +321,19 @@ void App::UpdatePlaying() {
     RemoveDeadEnemies();
     TrySpawnNextEnemy();
 
+    UpdateStageHud();
+
     HandlePlayerDeath();
     UpdatePlayerRespawn();
     UpdateEnemyRespawn();
-}
+
+    if (m_SpawnedEnemies >= static_cast<int>(m_EnemyQueue.size()) &&
+        GetAliveEnemyCount() == 0 &&
+        !m_EnemyRespawning) {
+            EnterStageClear();
+            return;
+        }
+    }
 
 void App::HandleSystemInput() {
     if (Util::Input::IsKeyUp(Util::Keycode::ESCAPE) ||
@@ -225,26 +342,15 @@ void App::HandleSystemInput() {
     }
 }
 
-void App::InitMap() {
+void App::InitMap(const std::vector<std::string>& mapData) {
     if (m_Map) {
         m_Map->Clear();
         m_Map.reset();
     }
 
     m_Map = std::make_unique<Map>(m_Root);
-    m_Map->Init();
+    m_Map->Init(mapData);
 }
-
-// void App::InitPlayer() {
-//
-//      if (m_Player) {
-//          m_Player->Clear();
-//          m_Player.reset();
-//      }
-//
-//      m_Player = std::make_unique<Player>(m_Root);
-//      m_Player->Init(0.0f, -300.0f);
-// }
 
 void App::InitBullets(int poolSize) {
     ClearBullets();
@@ -256,12 +362,6 @@ void App::InitBullets(int poolSize) {
 
 void App::InitEnemies() {
     ClearEnemies();
-    // m_Enemies.clear();
-    //
-    // auto enemy = std::make_unique<Enemy>(m_Root);
-    // enemy->Init(0.0f, 392.0f);
-    //
-    // m_Enemies.push_back(std::move(enemy));
 }
 
 void App::ClearBullets() {
@@ -298,9 +398,21 @@ void App::UpdateShootCooldown() {
 }
 
 void App::UpdatePlayer() {
-    if (m_Player && m_Map) {
-        m_Player->Update(*m_Map);
+    if (!m_Player || !m_Map) return;
+
+    std::vector<Rect> blockingRects;
+
+    for (const auto& enemy : m_Enemies) {
+        if (!enemy || !enemy->IsAlive()) continue;
+
+        blockingRects.push_back(enemy->GetCollisionRect());
     }
+
+    if (m_Base && m_Base->IsAlive()) {
+        blockingRects.push_back(m_Base->GetCollisionRect());
+    }
+
+    m_Player->Update(*m_Map, blockingRects);
 }
 
 void App::HandleShootInput() {
@@ -326,6 +438,24 @@ Bullet::Direction App::ConvertDirection(Player::Direction dir) const {
     }
 
     return Bullet::Direction::UP;
+}
+
+HitDirection App::ConvertBulletDirection(Bullet::Direction dir) const {
+    switch (dir) {
+        case Bullet::Direction::UP:
+            return HitDirection::UP;
+
+        case Bullet::Direction::DOWN:
+            return HitDirection::DOWN;
+
+        case Bullet::Direction::LEFT:
+            return HitDirection::LEFT;
+
+        case Bullet::Direction::RIGHT:
+            return HitDirection::RIGHT;
+    }
+
+    return HitDirection::UP;
 }
 
 glm::vec2 App::GetBulletSpawnPosition(glm::vec2 playerPos, Player::Direction dir) const {
@@ -377,61 +507,101 @@ void App::UpdateBullets() {
     if (!m_Map) return;
 
     for (auto& bullet : m_Bullets) {
-        if (!bullet->IsActive()) continue;
+        if (!bullet || !bullet->IsActive()) continue;
 
         bullet->Update();
 
-        Rect bulletRect = MakeRect(bullet->GetX(), bullet->GetY(), 4.0f, 4.0f);
+        Rect bulletRect = MakeRect(
+            bullet->GetX(),
+            bullet->GetY(),
+            4.0f,
+            4.0f
+        );
 
         bool hit = false;
+        bool shouldSpawnExplosion = false;
+
         float hitX = bullet->GetX();
         float hitY = bullet->GetY();
 
+        // 1. 檢查是否打到敵人
         for (auto& enemy : m_Enemies) {
-            if (!enemy->IsAlive()) continue;
+            if (!enemy || !enemy->IsAlive()) continue;
 
-            Rect enemyRect = MakeRect(enemy->GetX(), enemy->GetY(), 10.0f, 10.0f);
+            Rect enemyRect = MakeRect(
+                enemy->GetX(),
+                enemy->GetY(),
+                10.0f,
+                10.0f
+            );
 
             if (IsColliding(bulletRect, enemyRect)) {
-                hit = true;
                 enemy->TakeDamage();
-                bullet->Deactivate();
+
+                hit = true;
+                shouldSpawnExplosion = true;
                 break;
             }
         }
 
-        if (!hit && m_Map->HitTile(hitX, hitY)) {
-            hit = true;
+        // 2. 檢查是否打到地圖物件：Brick / Steel
+        if (!hit) {
+            TileObject* tile = m_Map->GetTileObjectAtWorld(hitX, hitY);
+
+            if (tile && tile->BlocksBullet()) {
+                TileHitInfo info;
+                info.hitPoint = {hitX, hitY};
+                info.direction = ConvertBulletDirection(bullet->GetDirection());
+                info.power = 1;
+
+                TileHitResult result = tile->OnBulletHit(info);
+
+                if (result.tileDestroyed) {
+                    m_Map->RemoveTileAtWorld(hitX, hitY);
+                }
+
+                if (result.bulletStopped) {
+                    hit = true;
+                    shouldSpawnExplosion = result.spawnExplosion;
+                }
+            }
         }
-        else if (!hit && bullet->IsOutOfBounds(*m_Map)) {
-            hit = true;
-        }
 
-        if (hit) {
-            bullet->Deactivate();
-            SpawnExplosion(hitX, hitY);
-        }
+        // 3. 檢查是否打到基地
+        if (!hit && m_Base && m_Base->IsAlive()) {
+            Rect baseRect = MakeRect(
+                m_Base->GetX(),
+                m_Base->GetY(),
+                16.0f,
+                16.0f
+            );
 
-        if (m_Base && m_Base->IsAlive()) {
-            float bx = bullet->GetX();
-            float by = bullet->GetY();
-
-            const float halfW = 10.0f;
-            const float halfH = 10.0f;
-
-            float baseX = m_Base->GetX();
-            float baseY = m_Base->GetY();
-
-            if (bx > baseX - halfW && bx < baseX + halfW &&
-                by > baseY - halfH && by < baseY + halfH) {
-
+            if (IsColliding(bulletRect, baseRect)) {
                 m_Base->Destroy();
                 bullet->Deactivate();
 
-                SpawnExplosion(baseX, baseY);
+                SpawnExplosion(m_Base->GetX(), m_Base->GetY());
 
-                EnterGameOver(); // ← 直接結束
+                EnterGameOver();
+                continue;
             }
+        }
+
+        // 4. 檢查是否超出邊界
+        if (!hit && bullet->IsOutOfBounds(*m_Map)) {
+            hit = true;
+            shouldSpawnExplosion = true;
+        }
+
+        // 5. 統一處理命中結果
+        if (hit) {
+            bullet->Deactivate();
+
+            if (shouldSpawnExplosion) {
+                SpawnExplosion(hitX, hitY);
+            }
+
+            continue;
         }
     }
 }
@@ -458,7 +628,33 @@ void App::UpdateEnemies() {
     if (!m_Map) return;
 
     for (auto& enemy : m_Enemies) {
-        enemy->Update(*m_Map);
+        if (!enemy) continue;
+
+        std::vector<Rect> blockingRects;
+
+        // 1. 玩家阻擋敵人
+        if (m_Player && m_Player->IsAlive()) {
+            blockingRects.push_back(m_Player->GetCollisionRect());
+        }
+
+        // 2. 其他敵人阻擋這隻敵人
+        for (const auto& otherEnemy : m_Enemies) {
+            if (!otherEnemy || otherEnemy.get() == enemy.get()) continue;
+            if (!otherEnemy->IsAlive()) continue;
+
+            blockingRects.push_back(otherEnemy->GetCollisionRect());
+        }
+
+        if (m_Base && m_Base->IsAlive()) {
+            blockingRects.push_back(m_Base->GetCollisionRect());
+        }
+
+        bool hasPlayer = m_Player && m_Player->IsAlive();
+        glm::vec2 playerPos = hasPlayer
+            ? m_Player->GetPosition()
+            : glm::vec2{0.0f, 0.0f};
+
+        enemy->Update(*m_Map, blockingRects, hasPlayer, playerPos);
 
         // ===== 新增：敵人子彈打玩家 =====
         if (!m_Player || !m_Player->IsAlive()) continue;
@@ -478,8 +674,8 @@ void App::UpdateEnemies() {
                 Rect baseRect = MakeRect(
                     m_Base->GetX(),
                     m_Base->GetY(),
-                    10.0f,
-                    10.0f
+                    16.0f,
+                    16.0f
                 );
 
                 if (IsColliding(bulletRect, baseRect)) {
@@ -509,7 +705,6 @@ void App::UpdateEnemies() {
                 // 刪子彈
                 bullet->Deactivate();
 
-                // 爆炸（用 App 的爆炸池，比 Enemy 自己那個好）
                 SpawnExplosion(hitX, hitY);
 
                 // 玩家死亡
@@ -560,7 +755,7 @@ void App::HandlePlayerDeath() {
     --m_PlayerLives;
 
     if (m_PlayerLives > 0) {
-        StartPlayerRespawn(-200.0f, -384.0f);
+        StartPlayerRespawn(-64.0f, -192.0f);
     } else {
         EnterGameOver();
     }
@@ -597,6 +792,8 @@ void App::UpdateEnemyRespawn() {
 void App::RemoveDeadEnemies() {
     for (auto it = m_Enemies.begin(); it != m_Enemies.end(); ) {
         if (*it && (*it)->IsRemovable()) {
+            OnEnemyDestroyed((*it)->GetType());
+
             (*it)->Clear();
             it = m_Enemies.erase(it);
             ++m_KilledEnemies;
@@ -607,16 +804,12 @@ void App::RemoveDeadEnemies() {
 }
 
 void App::EnterGameOver() {
+    std::cout << "EnterGameOver called. Current stage = "
+              << m_CurrentStage << std::endl;
+
     if (m_Phase == Phase::GAME_OVER) return;
 
     m_Phase = Phase::GAME_OVER;
-
-    m_GameOverBg = std::make_shared<Character>(
-        std::string(RESOURCE_DIR) + "/image/ui/black_bg.png"
-    );
-    m_GameOverBg->SetPosition({0.0f, 0.0f});
-    m_GameOverBg->SetZIndex(150.0f);
-    m_Root.AddChild(m_GameOverBg);
 
     m_GameOverBanner = std::make_unique<GameOverBanner>(m_Root);
     m_GameOverBanner->Init();
@@ -638,4 +831,65 @@ void App::ClearGameOverUi() {
         m_Root.RemoveChild(m_GameOverBg);
         m_GameOverBg.reset();
     }
+}
+
+void App::EnterStageClear() {
+    if (m_Phase == Phase::STAGE_CLEAR) return;
+
+    m_Phase = Phase::STAGE_CLEAR;
+
+    m_StageClearScreen = std::make_unique<StageClearScreen>(m_Root);
+    m_StageClearScreen->Init(
+        m_CurrentStage,
+        m_NormalKillCount,
+        m_FastKillCount,
+        m_PowerKillCount,
+        m_HeavyKillCount
+    );
+}
+
+void App::ClearStageClearUi() {
+    if (m_StageClearScreen) {
+        m_StageClearScreen->Clear();
+        m_StageClearScreen.reset();
+    }
+}
+
+void App::ClearPlayingObjects() {
+    ClearStageHud();
+
+    ClearBullets();
+    ClearExplosions();
+    ClearEnemies();
+
+    if (m_PlayerRespawnEffect) {
+        m_PlayerRespawnEffect->Clear();
+        m_PlayerRespawnEffect.reset();
+    }
+
+    if (m_EnemyRespawnEffect) {
+        m_EnemyRespawnEffect->Clear();
+        m_EnemyRespawnEffect.reset();
+    }
+
+    m_PlayerRespawning = false;
+    m_EnemyRespawning = false;
+
+    if (m_Player) {
+        m_Player->Clear();
+        m_Player.reset();
+    }
+
+    if (m_Base) {
+        m_Base->Clear();
+        m_Base.reset();
+    }
+
+    if (m_Map) {
+        m_Map->Clear();
+        m_Map.reset();
+    }
+
+    ClearGameOverUi();
+    ClearStageClearUi();
 }

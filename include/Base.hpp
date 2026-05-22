@@ -7,6 +7,7 @@
 
 #include <memory>
 #include "Util/Renderer.hpp"
+#include "Collision.hpp"
 #include "Character.hpp"
 
 class Base {
@@ -15,6 +16,9 @@ public:
 
     void Init(float x, float y);
     void Clear();
+
+    Rect GetCollisionRect() const;
+    Rect GetCollisionRectAt(float x, float y) const;
 
     void Destroy();              // 被打爆
     bool IsAlive() const;

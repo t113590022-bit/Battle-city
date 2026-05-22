@@ -4,6 +4,17 @@
 
 #include "Base.hpp"
 
+Rect Base::GetCollisionRect() const {
+    return GetCollisionRectAt(GetX(), GetY());
+}
+
+Rect Base::GetCollisionRectAt(float x, float y) const {
+    const float halfW = 14.0f;
+    const float halfH = 14.0f;
+
+    return MakeRect(x, y, halfW, halfH);
+}
+
 Base::Base(Util::Renderer& root)
     : m_Root(root) {}
 

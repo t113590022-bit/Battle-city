@@ -34,6 +34,8 @@ public:
     float GetX() const;
     float GetY() const;
 
+    Direction GetDirection() const;
+
     bool IsActive() const;
     void Deactivate();
 private:

@@ -19,7 +19,7 @@ void RespawnEffect::Init(float x, float y) {
 
     m_Effect = std::make_shared<Character>(GetImagePath(0));
     m_Effect->SetPosition({m_X, m_Y});
-    m_Effect->SetZIndex(100.0f);
+    m_Effect->SetZIndex(50.0f);
     m_Root.AddChild(m_Effect);
 }
 

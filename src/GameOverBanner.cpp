@@ -8,8 +8,8 @@ GameOverBanner::GameOverBanner(Util::Renderer& root)
     : m_Root(root) {}
 
 void GameOverBanner::Init() {
-    m_LeftX = -40.0f;
-    m_RightX = 40.0f;
+    m_LeftX = -18.0f;
+    m_RightX = 18.0f;
     m_Y = -500.0f;
     m_TargetY = 0.0f;
     m_Finished = false;
@@ -24,8 +24,8 @@ void GameOverBanner::Init() {
     m_Left->SetPosition({m_LeftX, m_Y});
     m_Right->SetPosition({m_RightX, m_Y});
 
-    m_Left->SetZIndex(1.0f);
-    m_Right->SetZIndex(1.0f);
+    m_Left->SetZIndex(99.0f);
+    m_Right->SetZIndex(99.0f);
 
     m_Root.AddChild(m_Left);
     m_Root.AddChild(m_Right);

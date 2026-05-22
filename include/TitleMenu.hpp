@@ -59,9 +59,9 @@ private:
     bool m_StartGame = false;
 
     std::vector<glm::vec2> m_MenuPositions = {
-        {-188.0f, -69.0f},
-        {-188.0f, -134.0f},
-        {-188.0f, -198.0f}
+        {-108.0f, -30.0f},
+        {-108.0f, -62.0f},
+        {-108.0f, -95.0f}
     };
 };
 

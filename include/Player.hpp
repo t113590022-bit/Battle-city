@@ -7,8 +7,10 @@
 
 #include <memory>      // shared_ptr
 #include <string>      // std::string
+#include <vector>
 #include "Map.hpp"
 #include "Explosion.hpp"
+#include "Collision.hpp"
 
 #include <glm/glm.hpp> // glm::vec2
 
@@ -27,8 +29,11 @@ public:
     explicit Player(Util::Renderer& root);
 
     void Init(float x, float y);
-    void Update(const Map& map);
+    void Update(const Map& map, const std::vector<Rect>& blockingRects);
     void Clear();
+
+    Rect GetCollisionRect() const;
+    Rect GetCollisionRectAt(float x, float y) const;
 
     bool IsAlive() const;
     bool IsExplosionFinished() const;
@@ -41,15 +46,15 @@ private:
     std::string GetTankImagePath(Direction dir, int frame) const;
     void UpdateAnimation(bool isMoving);
     void ClampToMap(const Map& map);
-    bool CanMoveTo(float newX, float newY, const Map& map) const;
+    bool CanMoveTo(float newX, float newY, const Map& map, const std::vector<Rect>& blockingRects) const;
 
 
 private:
     Util::Renderer& m_Root;
     std::shared_ptr<Character> m_Player;
 
-    int m_PlayerX = 0;
-    int m_PlayerY = 0;
+    float m_PlayerX = 0.0f;
+    float m_PlayerY = 0.0f;
     int m_MoveSpeed = 3;
 
     Direction m_Direction = Direction::UP;

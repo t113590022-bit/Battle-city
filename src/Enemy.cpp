@@ -45,7 +45,7 @@ void Enemy::Init(float x, float y, EnemyType type) {
 
     m_Enemy = std::make_shared<Character>(GetTankImagePath(m_Direction));
     m_Enemy->SetPosition({m_X, m_Y});
-    m_Enemy->SetZIndex(98.0f); // 比地圖高、但不用壓過爆炸
+    m_Enemy->SetZIndex(40.0f); // 比地圖高、但不用壓過爆炸
     m_Root.AddChild(m_Enemy);
 }
 
@@ -93,21 +93,114 @@ std::string Enemy::GetTankImagePath(Direction dir) const {
     return std::string(RESOURCE_DIR) + "/image/enemy/" + typeFolder + "/" + dirName + ".png";
 }
 
-bool Enemy::CanMoveTo(float newX, float newY, const Map& map) const {
-    const float halfW = 10.0f;
-    const float halfH = 10.0f;
+Rect Enemy::GetCollisionRect() const {
+    return GetCollisionRectAt(m_X, m_Y);
+}
 
+Rect Enemy::GetCollisionRectAt(float x, float y) const {
+    const float halfW = 12.0f;
+    const float halfH = 12.0f;
+
+    return MakeRect(x, y, halfW, halfH);
+}
+
+bool Enemy::CanMoveTo(float newX, float newY, const Map& map, const std::vector<Rect>& blockingRects) const {
+    const float halfW = 12.0f;
+    const float halfH = 12.0f;
+
+    // 1. 邊界
     if (newX - halfW < map.GetPlayLeft()) return false;
     if (newX + halfW > map.GetPlayRight()) return false;
     if (newY + halfH > map.GetPlayTop()) return false;
     if (newY - halfH < map.GetPlayBottom()) return false;
 
-    if (map.IsBlockedAtWorld(newX - halfW, newY + halfH)) return false;
-    if (map.IsBlockedAtWorld(newX + halfW, newY + halfH)) return false;
-    if (map.IsBlockedAtWorld(newX - halfW, newY - halfH)) return false;
-    if (map.IsBlockedAtWorld(newX + halfW, newY - halfH)) return false;
+    // 2. 地圖與半磚
+    const glm::vec2 checkPoints[] = {
+        // 四個角
+        {newX - halfW, newY + halfH},
+        {newX + halfW, newY + halfH},
+        {newX - halfW, newY - halfH},
+        {newX + halfW, newY - halfH},
+
+        // 四邊中心
+        {newX,         newY + halfH},
+        {newX,         newY - halfH},
+        {newX - halfW, newY},
+        {newX + halfW, newY},
+
+        // 上下邊 1/4、3/4
+        {newX - halfW * 0.5f, newY + halfH},
+        {newX + halfW * 0.5f, newY + halfH},
+        {newX - halfW * 0.5f, newY - halfH},
+        {newX + halfW * 0.5f, newY - halfH},
+
+        // 左右邊 1/4、3/4
+        {newX - halfW, newY + halfH * 0.5f},
+        {newX - halfW, newY - halfH * 0.5f},
+        {newX + halfW, newY + halfH * 0.5f},
+        {newX + halfW, newY - halfH * 0.5f},
+    };
+
+    for (const auto& point : checkPoints) {
+        if (map.IsBlockedAtWorld(point.x, point.y)) {
+            return false;
+        }
+    }
+
+    // 3. 其他坦克
+    Rect nextRect = GetCollisionRectAt(newX, newY);
+
+    for (const Rect& blocker : blockingRects) {
+        if (IsColliding(nextRect, blocker)) {
+            return false;
+        }
+    }
 
     return true;
+}
+
+Enemy::EnemyIntent Enemy::ChooseIntent(bool hasPlayer) const {
+    int r = std::rand() % 100;
+
+    if (!hasPlayer) {
+        if (r < 85) return EnemyIntent::AttackBase;
+        return EnemyIntent::Wander;
+    }
+
+    switch (m_Type) {
+        case EnemyType::NORMAL:
+            if (r < 70) return EnemyIntent::AttackBase;
+            if (r < 85) return EnemyIntent::AttackPlayer;
+            return EnemyIntent::Wander;
+
+        case EnemyType::FAST:
+            if (r < 80) return EnemyIntent::AttackBase;
+            if (r < 90) return EnemyIntent::AttackPlayer;
+            return EnemyIntent::Wander;
+
+        case EnemyType::POWER:
+            if (r < 50) return EnemyIntent::AttackBase;
+            if (r < 85) return EnemyIntent::AttackPlayer;
+            return EnemyIntent::Wander;
+
+        case EnemyType::HEAVY:
+            if (r < 40) return EnemyIntent::AttackBase;
+            if (r < 80) return EnemyIntent::AttackPlayer;
+            return EnemyIntent::Wander;
+    }
+
+    return EnemyIntent::AttackBase;
+}
+
+glm::vec2 Enemy::GetBaseTargetPosition() const {
+    return {0.0f, -192.0f};
+}
+
+float Enemy::GetDistanceSq(float x, float y, glm::vec2 target) const {
+    float dx = x - target.x;
+    float dy = y - target.y;
+
+    return dx * dx + dy * dy;
 }
 
 // void Enemy::ChangeDirectionRandom() {
@@ -119,7 +212,9 @@ bool Enemy::CanMoveTo(float newX, float newY, const Map& map) const {
 //     }
 // }
 
-void Enemy::ChangeDirectionSmart(const Map& map) {
+void Enemy::ChangeDirectionSmart(const Map& map, const std::vector<Rect>& blockingRects, bool hasPlayer, glm::vec2 playerPos) {
+    EnemyIntent intent = ChooseIntent(hasPlayer);
+
     Direction dirs[4] = {
         Direction::UP,
         Direction::DOWN,
@@ -127,28 +222,95 @@ void Enemy::ChangeDirectionSmart(const Map& map) {
         Direction::RIGHT
     };
 
+    // 先打亂，避免分數相同時永遠選同一方向
     for (int i = 0; i < 4; ++i) {
         int r = std::rand() % 4;
         std::swap(dirs[i], dirs[r]);
     }
+
+    // Wander 就維持原本隨機可走方向
+    if (intent == EnemyIntent::Wander) {
+        for (Direction dir : dirs) {
+            float testX = m_X;
+            float testY = m_Y;
+
+            switch (dir) {
+                case Direction::UP:
+                    testY += m_MoveSpeed;
+                    break;
+                case Direction::DOWN:
+                    testY -= m_MoveSpeed;
+                    break;
+                case Direction::LEFT:
+                    testX -= m_MoveSpeed;
+                    break;
+                case Direction::RIGHT:
+                    testX += m_MoveSpeed;
+                    break;
+            }
+
+            if (CanMoveTo(testX, testY, map, blockingRects)) {
+                m_Direction = dir;
+
+                if (m_Enemy) {
+                    m_Enemy->SetImage(GetTankImagePath(m_Direction));
+                }
+
+                return;
+            }
+        }
+    }
+
+    glm::vec2 target = GetBaseTargetPosition();
+
+    if (intent == EnemyIntent::AttackPlayer && hasPlayer) {
+        target = playerPos;
+    }
+
+    bool found = false;
+    Direction bestDir = m_Direction;
+    float bestScore = 999999999.0f;
 
     for (Direction dir : dirs) {
         float testX = m_X;
         float testY = m_Y;
 
         switch (dir) {
-            case Direction::UP:    testY += m_MoveSpeed; break;
-            case Direction::DOWN:  testY -= m_MoveSpeed; break;
-            case Direction::LEFT:  testX -= m_MoveSpeed; break;
-            case Direction::RIGHT: testX += m_MoveSpeed; break;
+            case Direction::UP:
+                testY += m_MoveSpeed;
+                break;
+
+            case Direction::DOWN:
+                testY -= m_MoveSpeed;
+                break;
+
+            case Direction::LEFT:
+                testX -= m_MoveSpeed;
+                break;
+
+            case Direction::RIGHT:
+                testX += m_MoveSpeed;
+                break;
         }
 
-        if (CanMoveTo(testX, testY, map)) {
-            m_Direction = dir;
-            if (m_Enemy) {
-                m_Enemy->SetImage(GetTankImagePath(m_Direction));
-            }
-            return;
+        if (!CanMoveTo(testX, testY, map, blockingRects)) {
+            continue;
+        }
+
+        float score = GetDistanceSq(testX, testY, target);
+
+        if (score < bestScore) {
+            bestScore = score;
+            bestDir = dir;
+            found = true;
+        }
+    }
+
+    if (found) {
+        m_Direction = bestDir;
+
+        if (m_Enemy) {
+            m_Enemy->SetImage(GetTankImagePath(m_Direction));
         }
     }
 }
@@ -176,6 +338,7 @@ glm::vec2 Enemy::GetBulletSpawnPosition() const {
     float bulletX = m_X;
     float bulletY = m_Y;
 
+    // 炮口射出
     const float muzzleOffset = 20.0f;
 
     switch (m_Direction) {
@@ -220,6 +383,24 @@ void Enemy::TryShoot() {
     }
 }
 
+HitDirection Enemy::ConvertBulletDirection(Bullet::Direction dir) const {
+    switch (dir) {
+        case Bullet::Direction::UP:
+            return HitDirection::UP;
+
+        case Bullet::Direction::DOWN:
+            return HitDirection::DOWN;
+
+        case Bullet::Direction::LEFT:
+            return HitDirection::LEFT;
+
+        case Bullet::Direction::RIGHT:
+            return HitDirection::RIGHT;
+    }
+
+    return HitDirection::UP;
+}
+
 void Enemy::UpdateBullet(Map& map) {
     // ===== 1. 更新子彈 =====
     if (m_Bullet && m_Bullet->IsActive()) {
@@ -229,20 +410,53 @@ void Enemy::UpdateBullet(Map& map) {
         float x = m_Bullet->GetX();
         float y = m_Bullet->GetY();
 
-        if (map.HitTile(x, y) || m_Bullet->IsOutOfBounds(map)) {
-            m_Bullet->Deactivate();
+        bool hit = false;
+        bool shouldSpawnExplosion = false;
 
-            if (m_Explosion) {
-                m_Explosion->Clear();
-                m_Explosion.reset();
+        // ===== 1-1. 檢查是否打到地圖物件：Brick / Steel =====
+        TileObject* tile = map.GetTileObjectAtWorld(x, y);
+
+        if (tile && tile->BlocksBullet()) {
+            TileHitInfo info;
+            info.hitPoint = {x, y};
+            info.direction = ConvertBulletDirection(m_Bullet->GetDirection());
+            info.power = 1;
+
+            TileHitResult result = tile->OnBulletHit(info);
+
+            if (result.tileDestroyed) {
+                map.RemoveTileAtWorld(x, y);
             }
 
-            m_Explosion = std::make_unique<Explosion>(m_Root);
-            m_Explosion->Init(x, y);
+            if (result.bulletStopped) {
+                hit = true;
+                shouldSpawnExplosion = result.spawnExplosion;
+            }
+        }
+
+        // ===== 1-2. 檢查是否超出邊界 =====
+        if (!hit && m_Bullet->IsOutOfBounds(map)) {
+            hit = true;
+            shouldSpawnExplosion = true;
+        }
+
+        // ===== 1-3. 統一處理命中結果 =====
+        if (hit) {
+            m_Bullet->Deactivate();
+
+            if (shouldSpawnExplosion) {
+                if (m_Explosion) {
+                    m_Explosion->Clear();
+                    m_Explosion.reset();
+                }
+
+                m_Explosion = std::make_unique<Explosion>(m_Root);
+                m_Explosion->Init(x, y);
+            }
         }
     }
 
-    // ===== 2. Explosion 永遠要更新（重點） =====
+    // ===== 2. Explosion 永遠要更新 =====
     if (m_Explosion) {
         m_Explosion->Update();
 
@@ -271,7 +485,7 @@ void Enemy::ClampToMap(const Map& map) {
     }
 }
 
-void Enemy::Update(Map& map) {
+void Enemy::Update(Map& map, const std::vector<Rect>& blockingRects, bool hasPlayer, glm::vec2 playerPos) {
     if (!m_Enemy) return;
 
     if (!m_Alive) {
@@ -308,9 +522,9 @@ void Enemy::Update(Map& map) {
             break;
     }
 
-    if (!CanMoveTo(nextX, nextY, map)) {
+    if (!CanMoveTo(nextX, nextY, map, blockingRects)) {
         if (m_TurnCooldownFrames == 0) {
-            ChangeDirectionSmart(map);
+            ChangeDirectionSmart(map, blockingRects, hasPlayer, playerPos);
             m_TurnCooldownFrames = m_TurnIntervalFrames;
         }
     }
@@ -321,7 +535,7 @@ void Enemy::Update(Map& map) {
     }
 
     if (std::rand() % 100 < 2) {
-        ChangeDirectionSmart(map);
+        ChangeDirectionSmart(map, blockingRects, hasPlayer, playerPos);
     }
 
     ClampToMap(map);
