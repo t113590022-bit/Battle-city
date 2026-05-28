@@ -4,8 +4,18 @@
 
 #include "Brick.hpp"
 
-Brick::Brick(Util::Renderer& root, float x, float y, int tileSize, State initialState)
-    : m_Root(root), m_X(x), m_Y(y), m_TileSize(tileSize), m_State(initialState) {
+Brick::Brick(
+    Util::Renderer& root,
+    float x,
+    float y,
+    int tileSize,
+    State initialState
+)
+    : m_Root(root),
+      m_X(x),
+      m_Y(y),
+      m_TileSize(tileSize),
+      m_State(initialState) {
 
     m_Image = std::make_shared<Character>(GetImagePathByState());
     m_Image->SetPosition({m_X, m_Y});
@@ -34,7 +44,7 @@ TileHitResult Brick::OnBulletHit(const TileHitInfo& hit) {
         return result;
     }
 
-    // 子彈打到這一格，但可能是半磚已經不存在的透明區域
+    // 子彈打到這一格，但可能是半磚 / 1/4 磚不存在的透明區域
     if (!ContainsSolidPart(hit.hitPoint)) {
         result.bulletStopped = false;
         result.spawnExplosion = false;
@@ -51,7 +61,7 @@ TileHitResult Brick::OnBulletHit(const TileHitInfo& hit) {
         return result;
     }
 
-    // 已經是半磚，再被打到實體部分，就整塊消失
+    // 半磚或 1/4 磚再被打中實體部分，就整格消失
     m_State = State::Destroyed;
     UpdateImage();
 

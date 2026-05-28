@@ -8,6 +8,7 @@
 #include "Collision.hpp"
 #include "StageIntroScreen.hpp"
 #include "Player.hpp"
+#include "ShieldEffect.hpp"
 #include "TileHitInfo.hpp"
 #include "StageData.hpp"
 #include "StageHud.hpp"
@@ -19,6 +20,7 @@
 #include "Base.hpp"
 #include "GameOverBanner.hpp"
 #include "StageClearScreen.hpp"
+#include "PowerUpItem.hpp"
 
 #include "pch.hpp" // IWYU pragma: export
 #include "Util/Image.hpp"
@@ -88,6 +90,19 @@ private:
     void UpdateBullets();
     void UpdateExplosions();
 
+    int GetActivePlayerBulletCount() const;
+    bool CanPlayerStartShootCycle() const;
+
+    void SpawnSinglePlayerBullet(
+        float x,
+        float y,
+        Bullet::Direction dir,
+        float speed,
+        int power
+    );
+
+    bool TryCancelEnemyBulletWithPlayerBullets(Bullet* enemyBullet);
+
     void InitEnemies();
     void UpdateEnemies();
     void PrepareStageEnemies(const std::vector<Enemy::EnemyType>& enemies);
@@ -99,7 +114,10 @@ private:
     void StartPlayerRespawn(float x, float y);
     void UpdatePlayerRespawn();
 
-    void StartEnemySpawn(float x, float y, Enemy::EnemyType type);
+    bool IsPowerUpCarrierSpawnIndex(int spawnIndex) const;
+    PowerUpType GetRandomPowerUpType() const;
+
+    void StartEnemySpawn(float x, float y, Enemy::EnemyType type, bool isPowerUpCarrier);
     void UpdateEnemyRespawn();
 
     void EnterGameOver();
@@ -114,6 +132,30 @@ private:
 
     void ClearPlayingObjects();
 
+    void UpdateStageClearPending();
+    bool ShouldStartStageClearPending() const;
+
+    int GetEnemyScore(Enemy::EnemyType type) const;
+
+    // 道具
+    // 玩家強度
+    void SpawnPowerUp(float x, float y, PowerUpType type);
+    void UpdatePowerUps();
+    void ApplyPowerUp(PowerUpType type);
+    void ClearPowerUps();
+    void UpdatePlayerBurstShot();
+
+
+    // 道具計時器
+    void UpdatePowerUpTimers();
+
+    // 手雷
+    void DestroyEnemiesByGrenade();
+
+    // 遊戲編譯的重設
+    void ResetCampaignState();
+    void ResetStageRuntimeState();
+
 private:
     State m_CurrentState = State::START;
     Phase m_Phase = Phase::TITLE;
@@ -127,6 +169,14 @@ private:
     int m_EnemySpawnCooldownFrames = 0;
     int m_EnemySpawnIntervalFrames = 200;
 
+    bool m_StageClearPending = false;
+    int m_StageClearDelayFrames = 0;
+
+    bool m_WaitingAfterStageClear = false;
+    int m_AfterStageClearWaitFrames = 0;
+
+    std::unique_ptr<ShieldEffect> m_PlayerShieldEffect;
+    int m_PlayerSpawnProtectFrames = 0;
 
     std::unique_ptr<TitleMenu> m_TitleMenu;
     std::unique_ptr<StageIntroScreen> m_StageIntroScreen;
@@ -140,6 +190,7 @@ private:
     std::shared_ptr<Character> m_PlayingBg;
 
     int m_PlayerLives = 2;
+    int m_PlayerUpgradeLevel = 0;
 
     // 玩家重生
     std::unique_ptr<RespawnEffect> m_PlayerRespawnEffect;
@@ -157,6 +208,7 @@ private:
     std::vector<Enemy::EnemyType> m_EnemyQueue;
 
     Enemy::EnemyType m_PendingEnemyType = Enemy::EnemyType::NORMAL;
+    bool m_PendingEnemyIsPowerUpCarrier = false;
 
     int m_SpawnedEnemies = 0;
     int m_KilledEnemies = 0;
@@ -177,6 +229,32 @@ private:
     int m_FastKillCount = 0;
     int m_PowerKillCount = 0;
     int m_HeavyKillCount = 0;
+
+    int m_PlayerScore = 0;          // 整局累積分數
+    int m_StagePowerUpScore = 0;    // 吃道具分數
+
+    // 玩家強度
+    std::vector<std::unique_ptr<PowerUpItem>> m_PowerUps;
+
+    // 時間暫停
+    int m_EnemyFreezeFrames = 0;
+
+    // 無敵
+    int m_PlayerInvincibleFrames = 0;
+
+    // 基地牆
+    int m_BaseShieldFrames = 0;
+    bool m_BaseShieldIsSteel = false;
+
+    // 升級雙發
+    int m_PlayerBurstRemaining = 0;
+    int m_PlayerBurstDelayFrames = 8;
+    int m_PlayerBurstDelayCounter = 0;
+
+    Player::Direction m_PendingBurstPlayerDir = Player::Direction::UP;
+    Bullet::Direction m_PendingBurstBulletDir = Bullet::Direction::UP;
+    float m_PendingBurstSpeed = 6.0f;
+    int m_PendingBurstPower = 1;
 };
 
 #endif

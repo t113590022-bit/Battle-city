@@ -7,46 +7,6 @@
 #include "Util/Input.hpp"
 #include "Util/Keycode.hpp"
 
-// struct Rect {
-//     float left;
-//     float right;
-//     float top;
-//     float bottom;
-// };
-
-// static Rect MakeRect(float x, float y, float halfW, float halfH) {
-//     return {
-//         x - halfW,
-//         x + halfW,
-//         y + halfH,
-//         y - halfH
-//     };
-// }
-//
-// static bool IsColliding(const Rect& a, const Rect& b) {
-//     return !(a.right < b.left ||
-//              a.left > b.right ||
-//              a.top < b.bottom ||
-//              a.bottom > b.top);
-// }
-//
-// static bool WouldHitCenterBrick(float nextX, float nextY) {
-//     // 玩家碰撞箱，先假設 32x32
-//     const float playerHalfW = 16.0f;
-//     const float playerHalfH = 16.0f;
-//
-//     // 中央磚塊碰撞箱，先假設 32x32，位置在 (0,0)
-//     const float brickX = 0.0f;
-//     const float brickY = 0.0f;
-//     const float brickHalfW = 16.0f;
-//     const float brickHalfH = 16.0f;
-//
-//     Rect playerRect = MakeRect(nextX, nextY, playerHalfW, playerHalfH);
-//     Rect brickRect = MakeRect(brickX, brickY, brickHalfW, brickHalfH);
-//
-//     return IsColliding(playerRect, brickRect);
-// }
-
 Player::Player(Util::Renderer& root)
     : m_Root(root) {}
 
@@ -64,26 +24,41 @@ void Player::Init(float x, float y) {
 }
 
 std::string Player::GetTankImagePath(Direction dir, int frame) const {
+    int visualLevel = m_UpgradeLevel + 1;
+
+    if (visualLevel < 1) {
+        visualLevel = 1;
+    }
+
+    if (visualLevel > 4) {
+        visualLevel = 4;
+    }
+
+    std::string suffix = "_lv" + std::to_string(visualLevel) + ".png";
+
     switch (dir) {
         case Direction::UP:
             return frame == 0
-                ? std::string(RESOURCE_DIR) + "/image/player/1p-front_lv1.png"
-                : std::string(RESOURCE_DIR) + "/image/player/1p-front2_lv1.png";
+                ? std::string(RESOURCE_DIR) + "/image/player/1p-front" + suffix
+                : std::string(RESOURCE_DIR) + "/image/player/1p-front2" + suffix;
+
         case Direction::DOWN:
             return frame == 0
-                ? std::string(RESOURCE_DIR) + "/image/player/1p-back_lv1.png"
-                : std::string(RESOURCE_DIR) + "/image/player/1p-back2_lv1.png";
+                ? std::string(RESOURCE_DIR) + "/image/player/1p-back" + suffix
+                : std::string(RESOURCE_DIR) + "/image/player/1p-back2" + suffix;
+
         case Direction::LEFT:
             return frame == 0
-                ? std::string(RESOURCE_DIR) + "/image/player/1p-left_lv1.png"
-                : std::string(RESOURCE_DIR) + "/image/player/1p-left2_lv1.png";
+                ? std::string(RESOURCE_DIR) + "/image/player/1p-left" + suffix
+                : std::string(RESOURCE_DIR) + "/image/player/1p-left2" + suffix;
+
         case Direction::RIGHT:
             return frame == 0
-                ? std::string(RESOURCE_DIR) + "/image/player/1p-right_lv1.png"
-                : std::string(RESOURCE_DIR) + "/image/player/1p-right2_lv1.png";
-        default:
-            return std::string(RESOURCE_DIR) + "/image/player/1p-front_lv1.png";
+                ? std::string(RESOURCE_DIR) + "/image/player/1p-right" + suffix
+                : std::string(RESOURCE_DIR) + "/image/player/1p-right2" + suffix;
     }
+
+    return std::string(RESOURCE_DIR) + "/image/player/1p-front" + suffix;
 }
 
 glm::vec2 Player::GetPosition() const {
@@ -266,9 +241,67 @@ bool Player::IsAlive() const {
     return m_IsAlive;
 }
 
+void Player::Upgrade() {
+    if (m_UpgradeLevel < 3) {
+        ++m_UpgradeLevel;
+    }
+
+    if (m_Player) {
+        m_Player->SetImage(GetTankImagePath(m_Direction, m_AnimFrame));
+    }
+}
+
+int Player::GetUpgradeLevel() const {
+    return m_UpgradeLevel;
+}
+
+void Player::SetUpgradeLevel(int level) {
+    if (level < 0) {
+        level = 0;
+    }
+
+    if (level > 3) {
+        level = 3;
+    }
+
+    m_UpgradeLevel = level;
+
+    if (m_Player) {
+        m_Player->SetImage(GetTankImagePath(m_Direction, m_AnimFrame));
+    }
+}
+
+float Player::GetBulletSpeed() const {
+    if (m_UpgradeLevel >= 1) {
+        return 9.0f;
+    }
+
+    return 6.0f;
+}
+
+int Player::GetBulletPower() const {
+    if (m_UpgradeLevel >= 3) {
+        return 2;
+    }
+
+    return 1;
+}
+
+bool Player::CanDoubleShot() const {
+    return m_UpgradeLevel >= 2;
+}
+
+void Player::SetInvincible(bool invincible) {
+    m_IsInvincible = invincible;
+}
+
+bool Player::IsInvincible() const {
+    return m_IsInvincible;
+}
 
 void Player::Kill() {
     if (!m_IsAlive) return;
+    if (m_IsInvincible) return;
 
     m_IsAlive = false;
 

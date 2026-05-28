@@ -9,6 +9,8 @@ StageClearScreen::StageClearScreen(Util::Renderer& root)
 
 void StageClearScreen::Init(
     int stageNo,
+    int playerScore,
+    int stagePowerUpScore,
     int normalKills,
     int fastKills,
     int powerKills,
@@ -21,6 +23,9 @@ void StageClearScreen::Init(
     m_CurrentRow = 0;
     m_FrameCounter = 0;
     m_Finished = false;
+
+    m_PlayerScore = playerScore;
+    m_StagePowerUpScore = stagePowerUpScore;
 
     BuildRows(normalKills, fastKills, powerKills, heavyKills);
 
@@ -41,10 +46,37 @@ void StageClearScreen::BuildRows(
 ) {
     m_Rows.clear();
 
-    m_Rows.push_back({Enemy::EnemyType::NORMAL, normalKills, 0, 100, 0});
-    m_Rows.push_back({Enemy::EnemyType::FAST,   fastKills,   0, 200, 0});
-    m_Rows.push_back({Enemy::EnemyType::POWER,  powerKills,  0, 300, 0});
-    m_Rows.push_back({Enemy::EnemyType::HEAVY,  heavyKills,  0, 400, 0});
+    ScoreRow normal;
+    normal.type = Enemy::EnemyType::NORMAL;
+    normal.totalKills = normalKills;
+    normal.countedKills = 0;
+    normal.countedScore = 0;
+    normal.scorePerKill = 100;
+    m_Rows.push_back(normal);
+
+    ScoreRow fast;
+    fast.type = Enemy::EnemyType::FAST;
+    fast.totalKills = fastKills;
+    fast.countedKills = 0;
+    fast.countedScore = 0;
+    fast.scorePerKill = 200;
+    m_Rows.push_back(fast);
+
+    ScoreRow power;
+    power.type = Enemy::EnemyType::POWER;
+    power.totalKills = powerKills;
+    power.countedKills = 0;
+    power.countedScore = 0;
+    power.scorePerKill = 300;
+    m_Rows.push_back(power);
+
+    ScoreRow heavy;
+    heavy.type = Enemy::EnemyType::HEAVY;
+    heavy.totalKills = heavyKills;
+    heavy.countedKills = 0;
+    heavy.countedScore = 0;
+    heavy.scorePerKill = 400;
+    m_Rows.push_back(heavy);
 }
 
 void StageClearScreen::CreateUi() {
@@ -80,9 +112,9 @@ void StageClearScreen::CreateUi() {
     m_PlayerText->SetZIndex(100.0f);
     m_Root.AddChild(m_PlayerText);
 
-    // 這個是一進畫面就直接顯示最終分數
+    // 最終分數
     m_PlayerScoreText = std::make_shared<TextObject>(
-        font, 22, std::to_string(m_FinalScore), Util::Color(255, 255, 255)
+        font, 22, std::to_string(m_PlayerScore), Util::Color(255, 255, 255)
     );
     m_PlayerScoreText->SetPosition({-20.0f, 65.0f});
     m_PlayerScoreText->SetZIndex(100.0f);
@@ -187,7 +219,7 @@ void StageClearScreen::Update() {
     if (row.countedKills < row.totalKills) {
         row.countedKills++;
         row.countedScore += row.scorePerKill;
-        m_DisplayTotal += row.scorePerKill;
+        m_DisplayTotal += 1;
         RefreshTexts();
     } else {
         m_CurrentRow++;

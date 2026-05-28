@@ -42,6 +42,19 @@ public:
     glm::vec2 GetPosition() const;
     Direction GetDirection() const;
 
+    // 玩家強度
+    void Upgrade();
+    int GetUpgradeLevel() const;
+    void SetUpgradeLevel(int level);
+
+    float GetBulletSpeed() const;
+    int GetBulletPower() const;
+    bool CanDoubleShot() const;
+
+    // 無敵
+    void SetInvincible(bool invincible);
+    bool IsInvincible() const;
+
 private:
     std::string GetTankImagePath(Direction dir, int frame) const;
     void UpdateAnimation(bool isMoving);
@@ -65,5 +78,9 @@ private:
 
     bool m_IsAlive = true;
     std::unique_ptr<Explosion> m_Explosion;
+
+    int m_UpgradeLevel = 0;
+
+    bool m_IsInvincible = false;
 };
 #endif //PLAYER_HPP

@@ -8,6 +8,7 @@
 #include <memory>      // shared_ptr
 #include <string>      // std::string
 #include <vector>      // std::vector
+#include <glm/glm.hpp>
 
 #include "Util/Renderer.hpp"
 #include "Character.hpp"
@@ -57,6 +58,13 @@ public:
     int GetRowCount() const;
     int GetColCount() const;
 
+    // 工兵鏟道具
+    void SetBaseProtectionSteel();
+    void SetBaseProtectionBrick();
+    void RestoreBaseProtection();
+
+    bool TryGetRandomOriginalEmptyPosition(glm::vec2& outPos) const;
+
 private:
     // void BuildTestMapData();
     void DrawMap();
@@ -65,6 +73,9 @@ private:
 
     bool IsInsideMapData(int row, int col) const;
 
+    // 工兵鏟
+    void SetTileCode(int row, int col, char code);
+
 private:
     Util::Renderer& m_Root;
 
@@ -72,6 +83,7 @@ private:
 
     // 15 關可換這個資料
     std::vector<std::string> m_StageData;
+    std::vector<std::string> m_OriginalStageData;
 
     // 每一格真正的地圖物件
     std::vector<std::vector<std::shared_ptr<TileObject>>> m_Tiles;

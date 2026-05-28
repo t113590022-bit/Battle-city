@@ -10,6 +10,8 @@ set(SRC_FILES
     Grass.cpp
     Water.cpp
     Player.cpp
+    ShieldEffect.cpp
+    PowerUpItem.cpp
     Bullet.cpp
     Character.cpp
     Explosion.cpp
@@ -26,6 +28,8 @@ set(INCLUDE_FILES
     StageIntroScreen.hpp
     StageHud.hpp
     Player.hpp
+    ShieldEffect.hpp
+    PowerUpItem.hpp
     StageData.hpp
     Map.hpp
     TileHitInfo.hpp

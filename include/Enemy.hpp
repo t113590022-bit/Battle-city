@@ -32,17 +32,24 @@ public:
         HEAVY
     };
 
+    enum class DeathReason {
+        None,
+        Bullet,
+        Grenade
+    };
+
     explicit Enemy(Util::Renderer& root);
 
-    void Init(float x, float y, EnemyType type );
-    void Update(Map& map, const std::vector<Rect>& blockingRects, bool hasPlayer, glm::vec2 playerPos);
+    void Init(float x, float y, EnemyType type, bool isPowerUpCarrier = false);
+    void Update(Map& map, const std::vector<Rect>& blockingRects, bool hasPlayer, glm::vec2 playerPos, bool frozen);
     void Clear();
 
     float GetX() const { return m_X; }
     float GetY() const { return m_Y; }
 
     bool IsAlive() const { return m_Alive; }
-    void Destroy();
+    void Destroy(DeathReason reason = DeathReason::Bullet);
+    DeathReason GetDeathReason() const { return m_DeathReason; }
 
     Rect GetCollisionRect() const;
     Rect GetCollisionRectAt(float x, float y) const;
@@ -54,6 +61,8 @@ public:
 
     EnemyType GetType() const { return m_Type; }
     int GetHP() const { return m_HP; }
+
+    bool IsPowerUpCarrier() const { return m_IsPowerUpCarrier; }
 
 private:
     // AI想法
@@ -107,5 +116,21 @@ private:
     float m_BulletSpeed = 5.0f;
 
     std::unique_ptr<Explosion> m_Explosion;
+
+    DeathReason m_DeathReason = DeathReason::None;
+
+    bool m_IsPowerUpCarrier = false;
+
+    int m_BlinkCounter = 0;
+    int m_BlinkInterval = 8;
+    bool m_BlinkAlt = false;
+
+    int m_PowerUpBlinkInterval = 8;     // 道具敵人紅色閃爍速度
+    int m_HeavyBlinkInterval = 3;       // 閃爍速度，數字越小越快
+
+    int m_DamageFlashFrames = 0;        // 受傷黃閃剩餘幀數
+    int m_DamageFlashDurationFrames = 10;
+
+    void UpdateVisualBlink();
 };
 #endif //ENEMY_HPP

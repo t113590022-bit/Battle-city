@@ -25,10 +25,9 @@ public:
 
     explicit Bullet(Util::Renderer& root);
 
-    void Init(float x, float y, Direction dir, float speed);
+    void Init(float x, float y, Direction dir, float speed, int power);
     void Update();
-    // void Clear();
-    //
+
     bool IsOutOfBounds(const Map& map) const;
 
     float GetX() const;
@@ -38,6 +37,8 @@ public:
 
     bool IsActive() const;
     void Deactivate();
+
+    int GetPower() const;
 private:
     std::string GetBulletImagePath(Direction dir) const;
 
@@ -53,6 +54,8 @@ private:
     Direction m_Direction = Direction::UP;
 
     bool m_Active = false; // 不可視
+
+    int m_Power = 1;
 };
 
 

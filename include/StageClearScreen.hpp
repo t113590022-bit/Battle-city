@@ -31,6 +31,8 @@ public:
 
     void Init(
         int stageNo,
+        int playerScore,
+        int stagePowerUpScore,
         int normalKills,
         int fastKills,
         int powerKills,
@@ -69,6 +71,9 @@ private:
     int m_FrameCounter = 0;
     int m_CountIntervalFrames = 8;   // 每幾幀加一台，可調
     bool m_Finished = false;
+
+    int m_PlayerScore = 0;
+    int m_StagePowerUpScore = 0;
 
     std::shared_ptr<Character> m_BlackBg;
     std::vector<std::shared_ptr<Character>> m_ArrowIcons;

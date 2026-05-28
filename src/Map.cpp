@@ -1,5 +1,6 @@
 #include "Map.hpp"
 #include <iostream>
+#include <random>
 
 
 static bool IsBrickCode(char code) {
@@ -100,6 +101,7 @@ void Map::Init(const std::vector<std::string>& stageData) {
     m_Root.AddChild(m_PlayingBg);
 
     m_StageData = stageData;
+    m_OriginalStageData = stageData;
 
     DrawMap();
 }
@@ -380,6 +382,7 @@ void Map::Clear() {
     m_Tiles.clear();
     m_WaterTiles.clear();
     m_StageData.clear();
+    m_OriginalStageData.clear();
 }
 
 float Map::GetLeft() const {
@@ -412,4 +415,119 @@ float Map::GetPlayTop() const {
 
 float Map::GetPlayBottom() const {
     return m_PlayAreaBottom;
+}
+
+void Map::SetTileCode(int row, int col, char code) {
+    if (!IsInsideMapData(row, col)) {
+        return;
+    }
+
+    if (m_Tiles[row][col]) {
+        m_Tiles[row][col]->Clear();
+        m_Tiles[row][col].reset();
+    }
+
+    m_StageData[row][col] = code;
+
+    float x = ColToWorldX(col);
+    float y = RowToWorldY(row);
+
+    if (IsBrickCode(code)) {
+        m_Tiles[row][col] = std::make_shared<Brick>(
+            m_Root,
+            x,
+            y,
+            m_TileSize,
+            GetBrickStateFromCode(code)
+        );
+        return;
+    }
+
+    if (IsSteelCode(code)) {
+        m_Tiles[row][col] = std::make_shared<Steel>(
+            m_Root,
+            x,
+            y,
+            m_TileSize,
+            GetSteelStateFromCode(code)
+        );
+        return;
+    }
+
+    m_Tiles[row][col] = nullptr;
+}
+
+void Map::SetBaseProtectionSteel() {
+    // 上排：4 D 3 的鐵磚
+    SetTileCode(11, 5, '8'); // 4 = 右下 1/4 磚 → 8 = 右下 1/4 鐵
+    SetTileCode(11, 6, 'd'); // D = 下半磚 → d = 下半鐵
+    SetTileCode(11, 7, '7'); // 3 = 左下 1/4 磚 → 7 = 左下 1/4 鐵
+
+    // 下排：R . L 的鐵磚
+    SetTileCode(12, 5, 'r'); // R = 右半磚 → r = 右半鐵
+    SetTileCode(12, 7, 'l'); // L = 左半磚 → l = 左半鐵
+}
+
+void Map::SetBaseProtectionBrick() {
+    // 上排：4 D 3
+    SetTileCode(11, 5, '4');
+    SetTileCode(11, 6, 'D');
+    SetTileCode(11, 7, '3');
+
+    // 下排：R . L
+    SetTileCode(12, 5, 'R');
+    SetTileCode(12, 7, 'L');
+}
+
+void Map::RestoreBaseProtection() {
+    SetBaseProtectionBrick();
+}
+
+bool Map::TryGetRandomOriginalEmptyPosition(glm::vec2& outPos) const {
+    std::vector<glm::vec2> candidates;
+
+    for (int row = 0; row < GetRowCount(); ++row) {
+        for (int col = 0; col < GetColCount(); ++col) {
+            if (row >= static_cast<int>(m_OriginalStageData.size())) {
+                continue;
+            }
+
+            if (col >= static_cast<int>(m_OriginalStageData[row].size())) {
+                continue;
+            }
+
+            // 只挑「原本地圖就是空白」的地方
+            if (m_OriginalStageData[row][col] != '.') {
+                continue;
+            }
+
+            // 避免生成在基地本體位置
+            if (row == 12 && col == 6) {
+                continue;
+            }
+
+            // 避免太靠近基地保護磚區域
+            if ((row == 11 || row == 12) && col >= 5 && col <= 7) {
+                continue;
+            }
+
+            float x = ColToWorldX(col);
+            float y = RowToWorldY(row);
+
+            candidates.push_back({x, y});
+        }
+    }
+
+    if (candidates.empty()) {
+        return false;
+    }
+
+    static std::mt19937 rng(std::random_device{}());
+    std::uniform_int_distribution<int> dist(
+        0,
+        static_cast<int>(candidates.size()) - 1
+    );
+
+    outPos = candidates[dist(rng)];
+    return true;
 }

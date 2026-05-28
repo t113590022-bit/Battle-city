@@ -13,11 +13,12 @@
         m_Root.AddChild(m_Bullet);
     }
 
-    void Bullet::Init(float x, float y, Direction dir, float speed) {
+    void Bullet::Init(float x, float y, Direction dir, float speed, int power) {
         m_X = x;
         m_Y = y;
         m_Direction = dir;
         m_Speed = speed;
+        m_Power = power;
         m_Active = true;
 
         m_Bullet->SetImage(GetBulletImagePath(dir));
@@ -38,6 +39,10 @@
         }
 
         return std::string(RESOURCE_DIR) + "/image/bullet/bullet_up.png";
+    }
+
+    int Bullet::GetPower() const {
+        return m_Power;
     }
 
     void Bullet::Update() {
@@ -70,13 +75,6 @@
 
     float Bullet::GetX() const { return m_X; }
     float Bullet::GetY() const { return m_Y; }
-    //
-    // void Bullet::Clear() {
-    //     if (m_Bullet) {
-    //         m_Root.RemoveChild(m_Bullet);
-    //         m_Bullet.reset();
-    //     }
-    // }
 
     Bullet::Direction Bullet::GetDirection() const {
         return m_Direction;

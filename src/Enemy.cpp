@@ -9,12 +9,18 @@
 Enemy::Enemy(Util::Renderer& root)
     : m_Root(root) {}
 
-void Enemy::Init(float x, float y, EnemyType type) {
+void Enemy::Init(float x, float y, EnemyType type, bool isPowerUpCarrier) {
     m_X = x;
     m_Y = y;
     m_Type = type;
+    m_IsPowerUpCarrier = isPowerUpCarrier;
+
+    m_BlinkCounter = 0;
+    m_BlinkAlt = false;
+
     m_Alive = true;
     m_Direction = Direction::DOWN;
+    m_DeathReason = DeathReason::None;
 
     // ===== 依種類設定屬性 =====
     switch (m_Type) {
@@ -45,31 +51,55 @@ void Enemy::Init(float x, float y, EnemyType type) {
 
     m_Enemy = std::make_shared<Character>(GetTankImagePath(m_Direction));
     m_Enemy->SetPosition({m_X, m_Y});
-    m_Enemy->SetZIndex(40.0f); // 比地圖高、但不用壓過爆炸
+    m_Enemy->SetZIndex(40.0f);
     m_Root.AddChild(m_Enemy);
 }
 
-std::string Enemy::GetTankImagePath(Direction dir) const {
-    std::string typeFolder;
+void Enemy::UpdateVisualBlink() {
+    if (!m_Enemy || !m_Alive) return;
 
-    switch (m_Type) {
-        case EnemyType::NORMAL:
-            typeFolder = "normal";
-            break;
-        case EnemyType::FAST:
-            typeFolder = "fast";
-            break;
-        case EnemyType::POWER:
-            typeFolder = "power";
-            break;
-        case EnemyType::HEAVY:
-            typeFolder = "heavy";
-            break;
-        default:
-            typeFolder = "normal";
-            break;
+    // 1. 受傷黃閃優先
+    if (m_DamageFlashFrames > 0) {
+        m_Enemy->SetImage(GetTankImagePath(m_Direction));
+
+        --m_DamageFlashFrames;
+
+        if (m_DamageFlashFrames == 0) {
+            m_BlinkCounter = 0;
+            m_BlinkAlt = false;
+            m_Enemy->SetImage(GetTankImagePath(m_Direction));
+        }
+
+        return;
     }
 
+    bool isHeavyBlink = (m_Type == EnemyType::HEAVY && m_HP > 1);
+    bool isPowerUpBlink = m_IsPowerUpCarrier;
+
+    if (!isHeavyBlink && !isPowerUpBlink) {
+        return;
+    }
+
+    ++m_BlinkCounter;
+
+    int interval = isHeavyBlink ? m_HeavyBlinkInterval : m_PowerUpBlinkInterval;
+
+    // 如果這台同時是道具敵人 + 重坦，這裡用道具敵人的速度也可以
+    if (isPowerUpBlink) {
+        interval = m_PowerUpBlinkInterval;
+    }
+
+    if (m_BlinkCounter < interval) {
+        return;
+    }
+
+    m_BlinkCounter = 0;
+    m_BlinkAlt = !m_BlinkAlt;
+
+    m_Enemy->SetImage(GetTankImagePath(m_Direction));
+}
+
+std::string Enemy::GetTankImagePath(Direction dir) const {
     std::string dirName;
 
     switch (dir) {
@@ -85,12 +115,51 @@ std::string Enemy::GetTankImagePath(Direction dir) const {
         case Direction::RIGHT:
             dirName = "right";
             break;
-        default:
-            dirName = "down";
+    }
+
+    std::string typeName;
+
+    switch (m_Type) {
+        case EnemyType::NORMAL:
+            typeName = "normal";
+            break;
+        case EnemyType::FAST:
+            typeName = "fast";
+            break;
+        case EnemyType::POWER:
+            typeName = "power";
+            break;
+        case EnemyType::HEAVY:
+            typeName = "heavy";
             break;
     }
 
-    return std::string(RESOURCE_DIR) + "/image/enemy/" + typeFolder + "/" + dirName + ".png";
+    std::string suffix = "";
+
+    // 受傷黃閃優先
+    if (m_Type == EnemyType::HEAVY && m_DamageFlashFrames > 0) {
+        suffix = "_yellow";
+    }
+    // 道具敵人：紅色 <-> 原本圖片 閃爍
+    else if (m_IsPowerUpCarrier) {
+        suffix = m_BlinkAlt ? "_red" : "";
+    }
+    // 重坦：平常綠色 <-> 原本圖片；最後一滴血維持原本鐵灰
+    else if (m_Type == EnemyType::HEAVY) {
+        if (m_HP > 1) {
+            suffix = m_BlinkAlt ? "_green" : "";
+        } else if (m_HP == 1) {
+            suffix = "";
+        }
+    }
+
+    return std::string(RESOURCE_DIR) +
+           "/image/enemy/" +
+           typeName +
+           "/" +
+           dirName +
+           suffix +
+           ".png";
 }
 
 Rect Enemy::GetCollisionRect() const {
@@ -202,15 +271,6 @@ float Enemy::GetDistanceSq(float x, float y, glm::vec2 target) const {
 
     return dx * dx + dy * dy;
 }
-
-// void Enemy::ChangeDirectionRandom() {
-//     int r = std::rand() % 4;
-//     m_Direction = static_cast<Direction>(r);
-//
-//     if (m_Enemy) {
-//         m_Enemy->SetImage(GetTankImagePath(m_Direction));
-//     }
-// }
 
 void Enemy::ChangeDirectionSmart(const Map& map, const std::vector<Rect>& blockingRects, bool hasPlayer, glm::vec2 playerPos) {
     EnemyIntent intent = ChooseIntent(hasPlayer);
@@ -376,7 +436,8 @@ void Enemy::TryShoot() {
             bulletPos.x,
             bulletPos.y,
             ConvertToBulletDirection(),
-            m_BulletSpeed
+            m_BulletSpeed,
+            1
         );
 
         m_ShootCooldownFrames = m_ShootIntervalFrames;
@@ -485,7 +546,7 @@ void Enemy::ClampToMap(const Map& map) {
     }
 }
 
-void Enemy::Update(Map& map, const std::vector<Rect>& blockingRects, bool hasPlayer, glm::vec2 playerPos) {
+void Enemy::Update(Map& map, const std::vector<Rect>& blockingRects, bool hasPlayer, glm::vec2 playerPos, bool frozen) {
     if (!m_Enemy) return;
 
     if (!m_Alive) {
@@ -499,6 +560,13 @@ void Enemy::Update(Map& map, const std::vector<Rect>& blockingRects, bool hasPla
         }
         return;
     };
+
+    UpdateVisualBlink();
+
+    if (frozen) {
+        UpdateBullet(map);  // 已射出的子彈照常飛
+        return;
+    }
 
     if (m_TurnCooldownFrames > 0) {
         --m_TurnCooldownFrames;
@@ -555,9 +623,20 @@ void Enemy::TakeDamage() {
     --m_HP;
 
     if (m_HP <= 0) {
-        Destroy();
-    } else {
-        // 之後可以做重坦受傷閃爍
+        Destroy(DeathReason::Bullet);
+        return;
+    }
+
+    // 重坦受到傷害時，短暫變黃色
+    if (m_Type == EnemyType::HEAVY) {
+        m_DamageFlashFrames = m_DamageFlashDurationFrames;
+        m_BlinkCounter = 0;
+        m_BlinkAlt = false;
+    }
+
+
+    if (m_Enemy) {
+        m_Enemy->SetImage(GetTankImagePath(m_Direction));
     }
 }
 
@@ -565,9 +644,10 @@ bool Enemy::IsRemovable() const {
     return !m_Alive && !m_Explosion;
 }
 
-void Enemy::Destroy() {
+void Enemy::Destroy(DeathReason reason) {
     if (!m_Alive) return;
 
+    m_DeathReason = reason;
     m_Alive = false;
 
     if (m_Enemy) {

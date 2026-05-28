@@ -8,6 +8,8 @@
 #include <memory>
 #include <string>
 
+#include <glm/glm.hpp>
+
 #include "Util/Renderer.hpp"
 #include "Character.hpp"
 #include "TileObject.hpp"
@@ -30,7 +32,13 @@ public:
     };
 
 public:
-    Brick(Util::Renderer& root, float x, float y, int tileSize, State initialState = State::Full);
+    Brick(
+        Util::Renderer& root,
+        float x,
+        float y,
+        int tileSize,
+        State initialState = State::Full
+    );
 
     bool BlocksTank() const override;
     bool BlocksBullet() const override;
