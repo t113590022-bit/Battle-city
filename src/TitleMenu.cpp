@@ -69,20 +69,6 @@ void TitleMenu::Update() {
         return;
     }
 
-    // 上下選單
-    if (Util::Input::IsKeyDown(Util::Keycode::W)) {
-        if (m_MenuIndex > 0) {
-            m_MenuIndex--;
-            m_MenuCursor->SetPosition(m_MenuPositions[m_MenuIndex]);
-        }
-    }
-    else if (Util::Input::IsKeyDown(Util::Keycode::S)) {
-        if (m_MenuIndex < 2) {
-            m_MenuIndex++;
-            m_MenuCursor->SetPosition(m_MenuPositions[m_MenuIndex]);
-        }
-    }
-
     // 游標動畫
     m_MenuAnimCounter++;
     if (m_MenuAnimCounter >= m_MenuAnimInterval) {

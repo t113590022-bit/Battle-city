@@ -52,21 +52,54 @@ public:
     float GetY() const override;
 
 private:
-    bool ContainsSolidPart(const glm::vec2& point) const;
-    State GetHalfStateAfterHit(const TileHitInfo& hit) const;
+    // 32x32 磚塊切成 4x4，每格 8x8
+    static constexpr int PieceRows = 4;
+    static constexpr int PieceCols = 4;
 
-    void UpdateImage();
-    std::string GetImagePathByState() const;
+private:
+    void InitMask(State initialState);
+    void CreatePieces();
+    void UpdatePiecesVisibility();
+
+    bool IsDestroyed() const;
+    bool ContainsSolidPart(const glm::vec2& point) const;
+
+    bool GetPieceIndexFromPoint(
+        const glm::vec2& point,
+        int& outRow,
+        int& outCol
+    ) const;
+
+    bool FindSolidHitPoint(
+        const TileHitInfo& hit,
+        glm::vec2& outHitPoint
+    ) const;
+
+    void DestroyPiecesByHit(const TileHitInfo& hit);
+
+    void ClearCell(int row, int col);
+    void ClearRect(int rowStart, int rowEnd, int colStart, int colEnd);
+
+    float GetLocalX(const glm::vec2& point) const;
+    float GetLocalYFromTop(const glm::vec2& point) const;
+
+    float ColToWorldX(int col) const;
+    float RowToWorldY(int row) const;
+
+    int ClampInt(int value, int minValue, int maxValue) const;
+
+    std::string GetPieceImagePath(int row, int col) const;
 
 private:
     Util::Renderer& m_Root;
-    std::shared_ptr<Character> m_Image;
 
     float m_X = 0.0f;
     float m_Y = 0.0f;
     int m_TileSize = 32;
 
-    State m_State = State::Full;
+    bool m_Solid[PieceRows][PieceCols] = {};
+    std::shared_ptr<Character> m_Pieces[PieceRows][PieceCols] = {};
 };
 
-#endif //BRICK_HPP
+
+#endif // BRICK_HPP

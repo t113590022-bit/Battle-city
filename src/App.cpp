@@ -63,6 +63,7 @@ void App::End() {
     ClearPowerUps();
     ClearBullets();
     ClearExplosions();
+    ClearScorePopups();
 
     if (m_PlayerShieldEffect) {
         m_PlayerShieldEffect->Clear();
@@ -97,6 +98,8 @@ void App::ResetCampaignState() {
 
     m_PlayerScore = 0;
     m_StagePowerUpScore = 0;
+
+    m_NextExtraLifeScore = 20000;
 
     m_EnemyFreezeFrames = 0;
     m_PlayerInvincibleFrames = 0;
@@ -326,7 +329,7 @@ void App::TrySpawnNextEnemy() {
 
     if (m_SpawnedEnemies >= static_cast<int>(m_EnemyQueue.size())) return;
 
-    const float spawnXs[3] = {0.0f, 160.0f, -160.0f};
+    const float spawnXs[3] = {0.0f, 192.0f, -192.0f};
     const float spawnY = 192.0f;
 
     float spawnX = spawnXs[m_NextSpawnPointIndex];
@@ -362,6 +365,8 @@ void App::OnEnemyDestroyed(Enemy::EnemyType type) {
     }
 
     m_PlayerScore += GetEnemyScore(type);
+
+    CheckExtraLifeByScore();
 }
 
 int App::GetEnemyScore(Enemy::EnemyType type) const {
@@ -380,6 +385,21 @@ int App::GetEnemyScore(Enemy::EnemyType type) const {
     }
 
     return 0;
+}
+
+// 20000一次加一命
+void App::CheckExtraLifeByScore() {
+    while (m_PlayerScore >= m_NextExtraLifeScore) {
+        ++m_PlayerLives;
+
+        std::cout << "[EXTRA LIFE] Score reached "
+                  << m_NextExtraLifeScore
+                  << ", lives = "
+                  << m_PlayerLives
+                  << std::endl;
+
+        m_NextExtraLifeScore += 20000;
+    }
 }
 
 void App::UpdatePlaying() {
@@ -438,6 +458,7 @@ void App::UpdatePlaying() {
     UpdatePowerUps();
     UpdateBullets();
     UpdateExplosions();
+    UpdateScorePopups();
     UpdateEnemies();
 
     RemoveDeadEnemies();
@@ -453,6 +474,10 @@ void App::UpdatePlaying() {
 }
 
 void App::HandleSystemInput() {
+    if (Util::Input::IsKeyDown(Util::Keycode::F8)) {
+        ToggleDebugMode();
+    }
+
     if (Util::Input::IsKeyUp(Util::Keycode::ESCAPE) ||
         Util::Input::IfExit()) {
         m_CurrentState = State::END;
@@ -522,14 +547,17 @@ void App::UpdatePlayer() {
 
     std::vector<Rect> blockingRects;
 
-    for (const auto& enemy : m_Enemies) {
-        if (!enemy || !enemy->IsAlive()) continue;
+    if (m_Player->IsCollisionEnabled()) {
+        for (const auto& enemy : m_Enemies) {
+            if (!enemy || !enemy->IsAlive()) continue;
+            if (!enemy->IsCollisionEnabled()) continue;
 
-        blockingRects.push_back(enemy->GetCollisionRect());
-    }
+            blockingRects.push_back(enemy->GetCollisionRect());
+        }
 
-    if (m_Base && m_Base->IsAlive()) {
-        blockingRects.push_back(m_Base->GetCollisionRect());
+        if (m_Base && m_Base->IsAlive()) {
+            blockingRects.push_back(m_Base->GetCollisionRect());
+        }
     }
 
     m_Player->Update(*m_Map, blockingRects);
@@ -603,7 +631,7 @@ glm::vec2 App::GetBulletSpawnPosition(glm::vec2 playerPos, Player::Direction dir
     float bulletX = playerPos.x;
     float bulletY = playerPos.y;
 
-    const float muzzleOffset = 14.0f;
+    const float muzzleOffset = 9.0f;
 
     switch (dir) {
         case Player::Direction::UP:
@@ -737,12 +765,16 @@ void App::UpdateBullets() {
             );
 
             if (IsColliding(bulletRect, baseRect)) {
-                m_Base->Destroy();
                 bullet->Deactivate();
 
-                SpawnExplosion(m_Base->GetX(), m_Base->GetY());
+                if (!m_DebugMode) {
+                    m_Base->Destroy();
 
-                EnterGameOver();
+                    SpawnExplosion(m_Base->GetX(), m_Base->GetY());
+
+                    EnterGameOver();
+                }
+
                 continue;
             }
         }
@@ -794,7 +826,6 @@ bool App::TryCancelEnemyBulletWithPlayerBullets(Bullet* enemyBullet) {
             playerBullet->Deactivate();
             enemyBullet->Deactivate();
 
-            // 你的需求是直接消失，不產生爆炸
             return true;
         }
     }
@@ -830,21 +861,23 @@ void App::UpdateEnemies() {
 
         std::vector<Rect> blockingRects;
 
-        // 1. 玩家阻擋敵人
-        if (m_Player && m_Player->IsAlive()) {
-            blockingRects.push_back(m_Player->GetCollisionRect());
-        }
+        if (enemy->IsCollisionEnabled()) {
+            // 1. 玩家阻擋敵人
+            if (m_Player && m_Player->IsAlive()) {
+                blockingRects.push_back(m_Player->GetCollisionRect());
+            }
 
-        // 2. 其他敵人阻擋這隻敵人
-        for (const auto& otherEnemy : m_Enemies) {
-            if (!otherEnemy || otherEnemy.get() == enemy.get()) continue;
-            if (!otherEnemy->IsAlive()) continue;
+            // 2. 其他敵人阻擋這隻敵人
+            for (const auto& otherEnemy : m_Enemies) {
+                if (!otherEnemy || otherEnemy.get() == enemy.get()) continue;
+                if (!otherEnemy->IsAlive()) continue;
 
-            blockingRects.push_back(otherEnemy->GetCollisionRect());
-        }
+                blockingRects.push_back(otherEnemy->GetCollisionRect());
+            }
 
-        if (m_Base && m_Base->IsAlive()) {
-            blockingRects.push_back(m_Base->GetCollisionRect());
+            if (m_Base && m_Base->IsAlive()) {
+                blockingRects.push_back(m_Base->GetCollisionRect());
+            }
         }
 
         bool hasPlayer = m_Player && m_Player->IsAlive();
@@ -882,9 +915,15 @@ void App::UpdateEnemies() {
 
                 if (IsColliding(bulletRect, baseRect)) {
                     bullet->Deactivate();
-                    m_Base->Destroy();
-                    SpawnExplosion(m_Base->GetX(), m_Base->GetY());
-                    EnterGameOver();
+
+                    if (!m_DebugMode) {
+                        m_Base->Destroy();
+
+                        SpawnExplosion(m_Base->GetX(), m_Base->GetY());
+
+                        EnterGameOver();
+                    }
+
                     continue;
                 }
             }
@@ -909,7 +948,7 @@ void App::UpdateEnemies() {
 
                 SpawnExplosion(hitX, hitY);
 
-                if (m_Player->IsInvincible()) {
+                if (m_DebugMode || m_Player->IsInvincible()) {
                     continue;
                 }
 
@@ -950,9 +989,20 @@ void App::UpdatePlayerRespawn() {
 
         m_Player->SetUpgradeLevel(m_PlayerUpgradeLevel);
 
+        Rect spawnArea = MakeRect(
+            m_PlayerRespawnX,
+            m_PlayerRespawnY,
+            18.0f,
+            18.0f
+        );
+
+        m_Player->DisableCollisionUntilLeaveSpawnArea(spawnArea);
+
         // 重生保護：3 秒
         m_PlayerSpawnProtectFrames = 3 * 60;
         m_Player->SetInvincible(true);
+
+        RefreshPlayerInvincibleState();
 
         // 重新建立保護罩，綁定新的 Player
         if (m_PlayerShieldEffect) {
@@ -1012,7 +1062,21 @@ void App::UpdateEnemyRespawn() {
         m_EnemyRespawnEffect.reset();
 
         auto enemy = std::make_unique<Enemy>(m_Root);
-        enemy->Init(m_EnemySpawnX, m_EnemySpawnY, m_PendingEnemyType, m_PendingEnemyIsPowerUpCarrier);
+        enemy->Init(
+            m_EnemySpawnX,
+            m_EnemySpawnY,
+            m_PendingEnemyType,
+            m_PendingEnemyIsPowerUpCarrier
+        );
+
+        Rect spawnArea = MakeRect(
+            m_EnemySpawnX,
+            m_EnemySpawnY,
+            18.0f,
+            18.0f
+        );
+
+        enemy->DisableCollisionUntilLeaveSpawnArea(spawnArea);
         m_Enemies.push_back(std::move(enemy));
 
         m_EnemyRespawning = false;
@@ -1034,7 +1098,15 @@ void App::RemoveDeadEnemies() {
             ++m_KilledEnemies;
 
             if ((*it)->GetDeathReason() == Enemy::DeathReason::Bullet) {
+                int score = GetEnemyScore((*it)->GetType());
+
                 OnEnemyDestroyed((*it)->GetType());
+
+                SpawnScorePopup(
+                    (*it)->GetX(),
+                    (*it)->GetY(),
+                    score
+                );
             }
 
             (*it)->Clear();
@@ -1090,6 +1162,11 @@ void App::EnterGameOver() {
 void App::UpdateGameOver() {
     if (m_GameOverBanner) {
         m_GameOverBanner->Update();
+    }
+
+    if (Util::Input::IsKeyDown(Util::Keycode::F12)) {
+        EnterTitle();
+        return;
     }
 }
 
@@ -1178,6 +1255,7 @@ void App::ClearPlayingObjects() {
     ClearPowerUps();
     ClearBullets();
     ClearExplosions();
+    ClearScorePopups();
 
     if (m_PlayerShieldEffect) {
         m_PlayerShieldEffect->Clear();
@@ -1253,7 +1331,15 @@ void App::UpdatePowerUps() {
         }
 
         if (IsColliding(playerRect, (*it)->GetCollisionRect())) {
+            Rect itemRect = (*it)->GetCollisionRect();
+
             ApplyPowerUp((*it)->GetType());
+
+            SpawnScorePopup(
+               (itemRect.left + itemRect.right) / 2.0f,
+               (itemRect.top + itemRect.bottom) / 2.0f,
+               500
+            );
 
             (*it)->Clear();
             it = m_PowerUps.erase(it);
@@ -1266,6 +1352,8 @@ void App::UpdatePowerUps() {
 void App::ApplyPowerUp(PowerUpType type) {
     m_PlayerScore += 500;
     m_StagePowerUpScore += 500;
+
+    CheckExtraLifeByScore();
 
     switch (type) {
         case PowerUpType::Tank:
@@ -1328,15 +1416,7 @@ void App::UpdatePowerUpTimers() {
         --m_PlayerSpawnProtectFrames;
     }
 
-    if (m_PlayerInvincibleFrames <= 0 && m_PlayerSpawnProtectFrames <= 0) {
-        if (m_Player) {
-            m_Player->SetInvincible(false);
-        }
-
-        if (m_PlayerShieldEffect) {
-            m_PlayerShieldEffect->SetVisible(false);
-        }
-    }
+    RefreshPlayerInvincibleState();
 
     if (m_BaseShieldFrames > 0) {
         --m_BaseShieldFrames;
@@ -1432,4 +1512,86 @@ void App::ClearPowerUps() {
     }
 
     m_PowerUps.clear();
+}
+
+// gameover後回title
+void App::EnterTitle() {
+    // 清掉遊戲中的所有物件、GameOver 畫面、StageClear 畫面
+    ClearPlayingObjects();
+    ClearGameOverUi();
+    ClearStageClearUi();
+    ClearStageIntroUi();
+
+    // 清掉舊的 TitleMenu，避免重複 AddChild
+    if (m_TitleMenu) {
+        m_TitleMenu->Clear();
+        m_TitleMenu.reset();
+    }
+
+    // 回到標題畫面
+    m_TitleMenu = std::make_unique<TitleMenu>(m_Root);
+    m_TitleMenu->Init();
+
+    m_Phase = Phase::TITLE;
+}
+
+// 作弊
+void App::ToggleDebugMode() {
+    m_DebugMode = !m_DebugMode;
+
+    std::cout << "[DEBUG MODE] "
+              << (m_DebugMode ? "ON" : "OFF")
+              << std::endl;
+
+    RefreshPlayerInvincibleState();
+}
+
+void App::RefreshPlayerInvincibleState() {
+    bool shouldBeInvincible =
+        m_DebugMode ||
+        m_PlayerInvincibleFrames > 0 ||
+        m_PlayerSpawnProtectFrames > 0;
+
+    if (m_Player) {
+        m_Player->SetInvincible(shouldBeInvincible);
+    }
+
+    if (m_PlayerShieldEffect) {
+        m_PlayerShieldEffect->SetVisible(shouldBeInvincible);
+    }
+}
+
+void App::SpawnScorePopup(float x, float y, int score) {
+    auto popup = std::make_unique<ScorePopup>(m_Root);
+    popup->Init(x, y, score);
+    m_ScorePopups.push_back(std::move(popup));
+}
+
+// 分數彈出
+void App::UpdateScorePopups() {
+    for (auto it = m_ScorePopups.begin(); it != m_ScorePopups.end(); ) {
+        if (!(*it)) {
+            it = m_ScorePopups.erase(it);
+            continue;
+        }
+
+        (*it)->Update();
+
+        if ((*it)->IsFinished()) {
+            (*it)->Clear();
+            it = m_ScorePopups.erase(it);
+        } else {
+            ++it;
+        }
+    }
+}
+
+void App::ClearScorePopups() {
+    for (auto& popup : m_ScorePopups) {
+        if (popup) {
+            popup->Clear();
+        }
+    }
+
+    m_ScorePopups.clear();
 }

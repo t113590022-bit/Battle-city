@@ -55,6 +55,12 @@ public:
     void SetInvincible(bool invincible);
     bool IsInvincible() const;
 
+    // 出生碰撞
+    void DisableCollisionUntilLeaveSpawnArea(const Rect& spawnArea);
+    void UpdateSpawnCollisionGrace();
+
+    bool IsCollisionEnabled() const;
+
 private:
     std::string GetTankImagePath(Direction dir, int frame) const;
     void UpdateAnimation(bool isMoving);
@@ -68,7 +74,7 @@ private:
 
     float m_PlayerX = 0.0f;
     float m_PlayerY = 0.0f;
-    int m_MoveSpeed = 3;
+    int m_MoveSpeed = 1;
 
     Direction m_Direction = Direction::UP;
 
@@ -82,5 +88,9 @@ private:
     int m_UpgradeLevel = 0;
 
     bool m_IsInvincible = false;
+
+    bool m_CollisionEnabled = true;
+    bool m_WaitingLeaveSpawnArea = false;
+    Rect m_SpawnAreaRect{};
 };
 #endif //PLAYER_HPP

@@ -64,6 +64,12 @@ public:
 
     bool IsPowerUpCarrier() const { return m_IsPowerUpCarrier; }
 
+    // 出生碰撞
+    void DisableCollisionUntilLeaveSpawnArea(const Rect& spawnArea);
+    void UpdateSpawnCollisionGrace();
+
+    bool IsCollisionEnabled() const;
+
 private:
     // AI想法
     enum class EnemyIntent {
@@ -99,7 +105,7 @@ private:
 
     float m_X = 300.0f;
     float m_Y = -400.0f;
-    float m_MoveSpeed = 2.0f;
+    float m_MoveSpeed = 1.0f;
 
     Direction m_Direction = Direction::DOWN;
     bool m_Alive = true;
@@ -132,5 +138,10 @@ private:
     int m_DamageFlashDurationFrames = 10;
 
     void UpdateVisualBlink();
+
+    // 出生碰撞
+    bool m_CollisionEnabled = true;
+    bool m_WaitingLeaveSpawnArea = false;
+    Rect m_SpawnAreaRect{};
 };
 #endif //ENEMY_HPP

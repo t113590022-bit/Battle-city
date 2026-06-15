@@ -21,6 +21,7 @@
 #include "GameOverBanner.hpp"
 #include "StageClearScreen.hpp"
 #include "PowerUpItem.hpp"
+#include "ScorePopup.hpp"
 
 #include "pch.hpp" // IWYU pragma: export
 #include "Util/Image.hpp"
@@ -124,6 +125,8 @@ private:
     void UpdateGameOver();
     void ClearGameOverUi();
 
+    void EnterTitle();
+
     void EnterStageClear();
     void UpdateStageClear();
     void ClearStageClearUi();
@@ -155,6 +158,22 @@ private:
     // 遊戲編譯的重設
     void ResetCampaignState();
     void ResetStageRuntimeState();
+
+    // 作弊
+    bool m_DebugMode = false;
+
+    void ToggleDebugMode();
+    void RefreshPlayerInvincibleState();
+
+    // 分數彈出
+    std::vector<std::unique_ptr<ScorePopup>> m_ScorePopups;
+
+    void SpawnScorePopup(float x, float y, int score);
+    void UpdateScorePopups();
+    void ClearScorePopups();
+
+    //過20000加血
+    void CheckExtraLifeByScore();
 
 private:
     State m_CurrentState = State::START;
@@ -255,6 +274,9 @@ private:
     Bullet::Direction m_PendingBurstBulletDir = Bullet::Direction::UP;
     float m_PendingBurstSpeed = 6.0f;
     int m_PendingBurstPower = 1;
+
+    // 過20000分加條血
+    int m_NextExtraLifeScore = 20000;
 };
 
 #endif

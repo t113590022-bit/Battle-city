@@ -23,6 +23,10 @@ void ShieldEffect::Init(Player* player) {
     // 玩家 ZIndex 是 40，所以保護罩放 45
     m_Shield->SetZIndex(45.0f);
 
+    if (m_Player) {
+        m_Shield->SetPosition(m_Player->GetPosition());
+    }
+
     m_Root.AddChild(m_Shield);
 }
 
@@ -31,13 +35,14 @@ void ShieldEffect::Update() {
         return;
     }
 
+    m_Shield->SetPosition(m_Player->GetPosition());
+
     if (!m_Visible || !m_Player->IsAlive()) {
         m_Shield->SetVisible(false);
         return;
     }
 
     m_Shield->SetVisible(true);
-    m_Shield->SetPosition(m_Player->GetPosition());
 
     ++m_AnimCounter;
 
@@ -45,15 +50,23 @@ void ShieldEffect::Update() {
         m_AnimCounter = 0;
         m_AnimFrame = (m_AnimFrame + 1) % 2;
         m_Shield->SetImage(GetShieldImagePath(m_AnimFrame));
+        m_Shield->SetPosition(m_Player->GetPosition());
     }
 }
 
 void ShieldEffect::SetVisible(bool visible) {
     m_Visible = visible;
 
-    if (m_Shield) {
-        m_Shield->SetVisible(visible);
+    if (!m_Shield) {
+        return;
     }
+
+    // 如果要顯示，先移到玩家身上，再打開 visible
+    if (visible && m_Player) {
+        m_Shield->SetPosition(m_Player->GetPosition());
+    }
+
+    m_Shield->SetVisible(visible);
 }
 
 bool ShieldEffect::IsVisible() const {

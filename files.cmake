@@ -20,6 +20,7 @@ set(SRC_FILES
     Base.cpp
     GameOverBanner.cpp
     StageClearScreen.cpp
+    ScorePopup.cpp
 )
 
 set(INCLUDE_FILES
@@ -47,6 +48,7 @@ set(INCLUDE_FILES
     GameOverBanner.hpp
     StageClearScreen.hpp
     TextObject.hpp
+    ScorePopup.hpp
 )
 
 set(TEST_FILES

@@ -1,7 +1,7 @@
 #include "Character.hpp"
-// #include "Util/Image.hpp"
 #include "Util/Animation.hpp"
-
+#include <unordered_map>
+#include "Util/Image.hpp"
 
 Character::Character(const std::string& ImagePath) {
     SetImage(ImagePath);
@@ -10,15 +10,29 @@ Character::Character(const std::string& ImagePath) {
 }
 
 void Character::SetImage(const std::string& ImagePath) {
+    static std::unordered_map<std::string, std::weak_ptr<Util::Image>> imageCache;
+
     m_ImagePath = ImagePath;
 
-    m_Drawable = std::make_shared<Util::Image>(m_ImagePath);
+    auto it = imageCache.find(m_ImagePath);
+
+    if (it != imageCache.end()) {
+        auto cachedImage = it->second.lock();
+
+        if (cachedImage) {
+            m_Drawable = cachedImage;
+            return;
+        }
+    }
+
+    auto newImage = std::make_shared<Util::Image>(m_ImagePath);
+    imageCache[m_ImagePath] = newImage;
+    m_Drawable = newImage;
 }
 
 
 void Character::Open() {
-    // m_ImagePath = GA_RESOURCE_DIR"/Image/Character/door_open.png"; // 加這行
-    m_Drawable = std::make_shared<Util::Image>(m_ImagePath);
+    SetImage(m_ImagePath);
 }
 
 void Character::Play() {

@@ -235,6 +235,8 @@ void Player::Update(const Map& map, const std::vector<Rect>& blockingRects) {
     // ClampToMap(map);
     UpdateAnimation(isMoving);
     m_Player->SetPosition({m_PlayerX, m_PlayerY});
+
+    UpdateSpawnCollisionGrace();
 }
 
 bool Player::IsAlive() const {
@@ -322,4 +324,32 @@ void Player::Clear() {
         m_Root.RemoveChild(m_Player);
         m_Player.reset();
     }
+}
+
+void Player::DisableCollisionUntilLeaveSpawnArea(const Rect& spawnArea) {
+    m_CollisionEnabled = false;
+    m_WaitingLeaveSpawnArea = true;
+    m_SpawnAreaRect = spawnArea;
+}
+
+void Player::UpdateSpawnCollisionGrace() {
+    if (!m_WaitingLeaveSpawnArea) {
+        return;
+    }
+
+    if (!IsAlive()) {
+        return;
+    }
+
+    Rect playerRect = GetCollisionRect();
+
+    // 完全離開出生區後，才恢復碰撞
+    if (!IsColliding(playerRect, m_SpawnAreaRect)) {
+        m_CollisionEnabled = true;
+        m_WaitingLeaveSpawnArea = false;
+    }
+}
+
+bool Player::IsCollisionEnabled() const {
+    return m_CollisionEnabled;
 }

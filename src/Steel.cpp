@@ -4,27 +4,132 @@
 
 #include "Steel.hpp"
 
-Steel::Steel(Util::Renderer& root, float x, float y, int tileSize, State initialState)
+Steel::Steel(
+    Util::Renderer& root,
+    float x,
+    float y,
+    int tileSize,
+    State initialState
+)
     : m_Root(root),
       m_X(x),
       m_Y(y),
-      m_TileSize(tileSize),
-      m_State(initialState)  {
+      m_TileSize(tileSize) {
 
-    m_Image = std::make_shared<Character>(GetImagePathByState());
-    m_Image->SetPosition({m_X, m_Y});
-    m_Image->SetZIndex(1.0f);
-    m_Image->SetVisible(true);
+    InitMask(initialState);
+    CreatePieces();
+    UpdatePiecesVisibility();
+}
 
-    m_Root.AddChild(m_Image);
+void Steel::InitMask(State initialState) {
+    for (int row = 0; row < Rows; ++row) {
+        for (int col = 0; col < Cols; ++col) {
+            m_Solid[row][col] = false;
+        }
+    }
+
+    switch (initialState) {
+        case State::Full:
+            m_Solid[0][0] = true;
+            m_Solid[0][1] = true;
+            m_Solid[1][0] = true;
+            m_Solid[1][1] = true;
+            break;
+
+        case State::TopHalf:
+            m_Solid[0][0] = true;
+            m_Solid[0][1] = true;
+            break;
+
+        case State::BottomHalf:
+            m_Solid[1][0] = true;
+            m_Solid[1][1] = true;
+            break;
+
+        case State::LeftHalf:
+            m_Solid[0][0] = true;
+            m_Solid[1][0] = true;
+            break;
+
+        case State::RightHalf:
+            m_Solid[0][1] = true;
+            m_Solid[1][1] = true;
+            break;
+
+        case State::TopLeftQuarter:
+            m_Solid[0][0] = true;
+            break;
+
+        case State::TopRightQuarter:
+            m_Solid[0][1] = true;
+            break;
+
+        case State::BottomLeftQuarter:
+            m_Solid[1][0] = true;
+            break;
+
+        case State::BottomRightQuarter:
+            m_Solid[1][1] = true;
+            break;
+
+        case State::Destroyed:
+            break;
+    }
+}
+
+void Steel::CreatePieces() {
+    for (int row = 0; row < Rows; ++row) {
+        for (int col = 0; col < Cols; ++col) {
+            auto piece = std::make_shared<Character>(
+                GetPieceImagePath(row, col)
+            );
+
+            // 如果 steel_q1 ~ steel_q4 是 32x32 透明定位圖，全部放在中心
+            piece->SetPosition({m_X, m_Y});
+
+            piece->SetZIndex(1.0f);
+            piece->SetVisible(m_Solid[row][col]);
+
+            m_Root.AddChild(piece);
+            m_Pieces[row][col] = piece;
+        }
+    }
+}
+
+std::string Steel::GetPieceImagePath(int row, int col) const {
+    std::string base = std::string(RESOURCE_DIR) + "/image/map/";
+
+    if (row == 0 && col == 0) {
+        return base + "steel_q1.png"; // 左上
+    }
+
+    if (row == 0 && col == 1) {
+        return base + "steel_q2.png"; // 右上
+    }
+
+    if (row == 1 && col == 0) {
+        return base + "steel_q3.png"; // 左下
+    }
+
+    return base + "steel_q4.png";     // 右下
+}
+
+void Steel::UpdatePiecesVisibility() {
+    for (int row = 0; row < Rows; ++row) {
+        for (int col = 0; col < Cols; ++col) {
+            if (m_Pieces[row][col]) {
+                m_Pieces[row][col]->SetVisible(m_Solid[row][col]);
+            }
+        }
+    }
 }
 
 bool Steel::BlocksTank() const {
-    return m_State != State::Destroyed;
+    return !IsDestroyed();
 }
 
 bool Steel::BlocksBullet() const {
-    return m_State != State::Destroyed;
+    return !IsDestroyed();
 }
 
 bool Steel::BlocksTankAtPoint(const glm::vec2& point) const {
@@ -34,7 +139,7 @@ bool Steel::BlocksTankAtPoint(const glm::vec2& point) const {
 TileHitResult Steel::OnBulletHit(const TileHitInfo& hit) {
     TileHitResult result;
 
-    if (m_State == State::Destroyed) {
+    if (IsDestroyed()) {
         return result;
     }
 
@@ -55,157 +160,158 @@ TileHitResult Steel::OnBulletHit(const TileHitInfo& hit) {
         return result;
     }
 
-    // 穿甲彈可以破壞鋼鐵
-    if (m_State == State::Full) {
-        m_State = GetHalfStateAfterHit(hit);
-        UpdateImage();
-        return result;
-    }
+    // 穿甲彈才會破壞鋼鐵
+    DestroyByPiercingHit(hit);
+    UpdatePiecesVisibility();
 
-    // 半鐵 / 1/4 鐵再被穿甲彈打到實體部分，消失
-    m_State = State::Destroyed;
-    UpdateImage();
+    result.tileDestroyed = IsDestroyed();
 
-    result.tileDestroyed = true;
     return result;
 }
 
+bool Steel::IsDestroyed() const {
+    for (int row = 0; row < Rows; ++row) {
+        for (int col = 0; col < Cols; ++col) {
+            if (m_Solid[row][col]) {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
 bool Steel::ContainsSolidPart(const glm::vec2& point) const {
-    if (m_State == State::Destroyed) {
+    int row = 0;
+    int col = 0;
+
+    if (!GetPieceIndexFromPoint(point, row, col)) {
         return false;
     }
 
-    if (m_State == State::Full) {
-        return true;
-    }
-
-    float left = m_X - m_TileSize / 2.0f;
-    float top = m_Y + m_TileSize / 2.0f;
-
-    float localX = point.x - left;
-    float localYFromTop = top - point.y;
-
-    float half = m_TileSize / 2.0f;
-
-    switch (m_State) {
-        case State::TopHalf:
-            return localYFromTop < half;
-
-        case State::BottomHalf:
-            return localYFromTop >= half;
-
-        case State::LeftHalf:
-            return localX < half;
-
-        case State::RightHalf:
-            return localX >= half;
-
-        case State::TopLeftQuarter:
-            return localX < half && localYFromTop < half;
-
-        case State::TopRightQuarter:
-            return localX >= half && localYFromTop < half;
-
-        case State::BottomLeftQuarter:
-            return localX < half && localYFromTop >= half;
-
-        case State::BottomRightQuarter:
-            return localX >= half && localYFromTop >= half;
-
-        case State::Full:
-            return true;
-
-        case State::Destroyed:
-            return false;
-    }
-
-    return false;
+    return m_Solid[row][col];
 }
 
-Steel::State Steel::GetHalfStateAfterHit(const TileHitInfo& hit) const {
-    float left = m_X - m_TileSize / 2.0f;
-    float top = m_Y + m_TileSize / 2.0f;
+float Steel::GetLocalX(const glm::vec2& point) const {
+    const float left = m_X - m_TileSize / 2.0f;
+    return point.x - left;
+}
 
-    float localX = hit.hitPoint.x - left;
-    float localYFromTop = top - hit.hitPoint.y;
+float Steel::GetLocalYFromTop(const glm::vec2& point) const {
+    const float top = m_Y + m_TileSize / 2.0f;
+    return top - point.y;
+}
 
-    float half = m_TileSize / 2.0f;
+bool Steel::GetPieceIndexFromPoint(
+    const glm::vec2& point,
+    int& outRow,
+    int& outCol
+) const {
+    float localX = GetLocalX(point);
+    float localYFromTop = GetLocalYFromTop(point);
+
+    if (localX < 0.0f || localX >= m_TileSize) {
+        return false;
+    }
+
+    if (localYFromTop < 0.0f || localYFromTop >= m_TileSize) {
+        return false;
+    }
+
+    const float pieceSize = m_TileSize / 2.0f; // 16
+
+    outCol = static_cast<int>(localX / pieceSize);
+    outRow = static_cast<int>(localYFromTop / pieceSize);
+
+    if (outRow < 0 || outRow >= Rows) {
+        return false;
+    }
+
+    if (outCol < 0 || outCol >= Cols) {
+        return false;
+    }
+
+    return true;
+}
+
+void Steel::DestroyByPiercingHit(const TileHitInfo& hit) {
+    int row = 0;
+    int col = 0;
+
+    if (!GetPieceIndexFromPoint(hit.hitPoint, row, col)) {
+        return;
+    }
+
+    float localX = GetLocalX(hit.hitPoint);
+    float localYFromTop = GetLocalYFromTop(hit.hitPoint);
+
+    // 32x32 鋼磚中間區域：8 ~ 24
+    // 打中這個範圍，視為打正中間，消半磚
+    const bool verticalCenterHit =
+        localX >= 8.0f && localX < 24.0f;
+
+    const bool horizontalCenterHit =
+        localYFromTop >= 8.0f && localYFromTop < 24.0f;
 
     switch (hit.direction) {
         case HitDirection::UP:
         case HitDirection::DOWN:
-            if (localYFromTop < half) {
-                return State::BottomHalf;
+            if (verticalCenterHit) {
+                // 上下方向打正中間：消掉目前命中的整排
+                ClearRect(row, row, 0, 1);
             } else {
-                return State::TopHalf;
+                // 上下方向打偏：只消掉目前命中的 1/4
+                ClearCell(row, col);
             }
+            break;
 
         case HitDirection::LEFT:
         case HitDirection::RIGHT:
-            if (localX < half) {
-                return State::RightHalf;
+            if (horizontalCenterHit) {
+                // 左右方向打正中間：消掉目前命中的整列
+                ClearRect(0, 1, col, col);
             } else {
-                return State::LeftHalf;
+                // 左右方向打偏：只消掉目前命中的 1/4
+                ClearCell(row, col);
             }
+            break;
     }
-
-    return State::Full;
 }
 
-void Steel::UpdateImage() {
-    if (!m_Image) return;
-
-    if (m_State == State::Destroyed) {
-        m_Image->SetVisible(false);
+void Steel::ClearCell(int row, int col) {
+    if (row < 0 || row >= Rows) {
         return;
     }
 
-    m_Image->SetImage(GetImagePathByState());
-    m_Image->SetVisible(true);
-}
-
-std::string Steel::GetImagePathByState() const {
-    std::string base = std::string(RESOURCE_DIR) + "/image/map/";
-
-    switch (m_State) {
-        case State::Full:
-            return base + "steel_full.png";
-
-        case State::TopHalf:
-            return base + "steel_top.png";
-
-        case State::BottomHalf:
-            return base + "steel_bottom.png";
-
-        case State::LeftHalf:
-            return base + "steel_left.png";
-
-        case State::RightHalf:
-            return base + "steel_right.png";
-
-        case State::TopLeftQuarter:
-            return base + "steel_q1.png";
-
-        case State::TopRightQuarter:
-            return base + "steel_q2.png";
-
-        case State::BottomLeftQuarter:
-            return base + "steel_q3.png";
-
-        case State::BottomRightQuarter:
-            return base + "steel_q4.png";
-
-        case State::Destroyed:
-            return base + "steel_full.png";
+    if (col < 0 || col >= Cols) {
+        return;
     }
 
-    return base + "steel_full.png";
+    m_Solid[row][col] = false;
+}
+
+void Steel::ClearRect(int rowStart, int rowEnd, int colStart, int colEnd) {
+    if (rowStart < 0) rowStart = 0;
+    if (rowEnd >= Rows) rowEnd = Rows - 1;
+
+    if (colStart < 0) colStart = 0;
+    if (colEnd >= Cols) colEnd = Cols - 1;
+
+    for (int row = rowStart; row <= rowEnd; ++row) {
+        for (int col = colStart; col <= colEnd; ++col) {
+            ClearCell(row, col);
+        }
+    }
 }
 
 void Steel::Clear() {
-    if (m_Image) {
-        m_Root.RemoveChild(m_Image);
-        m_Image.reset();
+    for (int row = 0; row < Rows; ++row) {
+        for (int col = 0; col < Cols; ++col) {
+            if (m_Pieces[row][col]) {
+                m_Root.RemoveChild(m_Pieces[row][col]);
+                m_Pieces[row][col].reset();
+            }
+        }
     }
 }
 

@@ -399,7 +399,7 @@ glm::vec2 Enemy::GetBulletSpawnPosition() const {
     float bulletY = m_Y;
 
     // 炮口射出
-    const float muzzleOffset = 20.0f;
+    const float muzzleOffset = 9.0f;
 
     switch (m_Direction) {
         case Direction::UP:
@@ -615,6 +615,8 @@ void Enemy::Update(Map& map, const std::vector<Rect>& blockingRects, bool hasPla
 
     TryShoot();
     UpdateBullet(map);
+
+    UpdateSpawnCollisionGrace();
 }
 
 void Enemy::TakeDamage() {
@@ -682,4 +684,31 @@ void Enemy::Clear() {
         m_Root.RemoveChild(m_Enemy);
         m_Enemy.reset();
     }
+}
+
+void Enemy::DisableCollisionUntilLeaveSpawnArea(const Rect& spawnArea) {
+    m_CollisionEnabled = false;
+    m_WaitingLeaveSpawnArea = true;
+    m_SpawnAreaRect = spawnArea;
+}
+
+void Enemy::UpdateSpawnCollisionGrace() {
+    if (!m_WaitingLeaveSpawnArea) {
+        return;
+    }
+
+    if (!IsAlive()) {
+        return;
+    }
+
+    Rect enemyRect = GetCollisionRect();
+
+    if (!IsColliding(enemyRect, m_SpawnAreaRect)) {
+        m_CollisionEnabled = true;
+        m_WaitingLeaveSpawnArea = false;
+    }
+}
+
+bool Enemy::IsCollisionEnabled() const {
+    return m_CollisionEnabled;
 }
