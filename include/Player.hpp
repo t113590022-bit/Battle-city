@@ -67,6 +67,11 @@ private:
     void ClampToMap(const Map& map);
     bool CanMoveTo(float newX, float newY, const Map& map, const std::vector<Rect>& blockingRects) const;
 
+    float SnapToGrid(float value) const;
+    bool TryAlignToGrid(float& value) const;
+    void ApplyGridAssist(float& nextX, float& nextY, Direction dir, const Map& map, const std::vector<Rect>& blockingRects) const;
+
+    bool IsTankRectBlockedByMap(float newX, float newY, const Map& map, float halfW = 13.0f, float halfH = 13.0f) const;
 
 private:
     Util::Renderer& m_Root;
