@@ -403,6 +403,12 @@ void App::CheckExtraLifeByScore() {
 }
 
 void App::UpdatePlaying() {
+    // F11：重新開始目前關卡
+    if (Util::Input::IsKeyPressed(Util::Keycode::F11)) {
+        EnterPlaying();
+        return;
+    }
+
     if (Util::Input::IsKeyPressed(Util::Keycode::F1)) {
         m_NormalKillCount = 5;
         m_FastKillCount = 4;
